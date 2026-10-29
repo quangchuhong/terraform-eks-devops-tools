@@ -3,7 +3,7 @@ resource "helm_release" "gitlab" {
   name             = "gitlab"
   repository       = "https://charts.gitlab.io/"
   chart            = "gitlab"
-  version          = "9.11.5"
+  version          = var.gitlab_chart_version
   namespace        = "gitlab"
   create_namespace = true
 

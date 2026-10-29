@@ -58,6 +58,16 @@ variable "helm_chart_version" {
   description = "Cluster Autoscaler Helm chart version"
 }
 
+# ---------- GitLab ----------
+# Version của Helm chart gitlab/gitlab (KHÔNG phải version GitLab).
+# Tra chart ↔ app version: helm search repo gitlab/gitlab --versions
+# Chỉ nâng trong cùng minor (bản vá) bằng helm upgrade tại chỗ; nâng major phải theo upgrade path của GitLab.
+variable "gitlab_chart_version" {
+  type        = string
+  description = "Version Helm chart gitlab/gitlab"
+  default     = "9.11.5" # GitLab v18.11.4
+}
+
 # ---------- DNS / Route 53 ----------
 # Domain gốc cho mọi app (gitlab.<domain>, nexus.<domain>, ...).
 # Terraform tạo hosted zone public cho domain này (dns.tf).

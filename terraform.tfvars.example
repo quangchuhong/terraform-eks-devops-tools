@@ -7,6 +7,9 @@
 # Admin cụm EKS ngoài người chạy Terraform (IAM user/role, không dùng root)
 # cluster_admin_arns = ["arn:aws:iam::609320954321:role/<ten-role>"]
 
+# Version chart GitLab (helm search repo gitlab/gitlab --versions)
+# gitlab_chart_version = "9.11.5"
+
 # domain                    = "gitlabonlinecom.click"
 # manage_domain_nameservers = true
 
