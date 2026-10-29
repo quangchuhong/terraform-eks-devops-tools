@@ -1,7 +1,7 @@
 
 # # main.tf
 terraform {
-  required_version = ">= 1.0"
+  required_version = ">= 1.11" # use_lockfile của backend S3 cần >= 1.11
   required_providers {
     aws = {
       source  = "hashicorp/aws"

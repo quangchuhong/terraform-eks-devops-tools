@@ -1,0 +1,45 @@
+# ---------- Terraform ----------
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# Biến chứa giá trị thật (password, ID...) — commit file *.tfvars.example thay thế
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# KHÔNG ignore .terraform.lock.hcl — file này cần commit để khoá version provider
+
+# ---------- Secret / chứng chỉ / kubeconfig ----------
+*.pem
+*.key
+*.csr
+*.p12
+*.pfx
+*.jks
+**/csr-key/
+kubeconfig
+*.kubeconfig
+.kube/
+.env
+.env.*
+# Values chứa secret thật: đặt tên dạng *.secret.yaml (không commit)
+*.secret.yaml
+*.secret.yml
+secrets/
+
+# ---------- OS / Editor ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
