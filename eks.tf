@@ -2,23 +2,23 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
 
-  name               = "eks-cluster-ver1"
+  name               = var.cluster_name
   kubernetes_version = "1.34"
 
   addons = {
-    coredns                = {}
+    coredns = {}
     eks-pod-identity-agent = {
       before_compute = true
     }
-    kube-proxy             = {}
+    kube-proxy = {}
 
-    vpc-cni                = {
+    vpc-cni = {
       before_compute = true
     }
 
     aws-ebs-csi-driver = {
       service_account_role_arn = module.ebs_csi_iam.iam_role_arn
-      most_recent = true
+      most_recent              = true
     }
 
   }
@@ -30,20 +30,20 @@ module "eks" {
   # Optional: Adds the current caller identity as an administrator via cluster access entry
   enable_cluster_creator_admin_permissions = true
 
-  access_entries = {
-    # Example for an administrative IAM user
-    admin_user_access = {
-        principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" # Replace with your admin user ARN
-        policy_associations = {
-        admin_policy = {
-            policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-            access_scope = {
-            type = "cluster"
-            }
-         }
-        }
-    }
-  }
+  # Người chạy Terraform (IAM user quangch.cloud.10) đã có quyền admin nhờ
+  # enable_cluster_creator_admin_permissions ở trên.
+  # Access entry chỉ nhận IAM user/role, không nhận ":root" → thêm role admin khác tại đây nếu cần:
+  # access_entries = {
+  #   admin_role = {
+  #     principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/<AdminRole>"
+  #     policy_associations = {
+  #       admin_policy = {
+  #         policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  #         access_scope = { type = "cluster" }
+  #       }
+  #     }
+  #   }
+  # }
 
   vpc_id                   = "vpc-03fb9f55496d71836"
   subnet_ids               = ["subnet-0189d8013dc13f181", "subnet-012955c7d5094705c", "subnet-0c403ad0b306974dc"]
@@ -79,12 +79,12 @@ module "eks" {
   }
 
   tags = {
-      "Environment"                                   = "dev" 
-      "Terraform"                                     = "true"
-      "k8s.io/cluster-autoscaler/enabled"             = "true"
-      "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+    "Environment"                                   = "dev"
+    "Terraform"                                     = "true"
+    "k8s.io/cluster-autoscaler/enabled"             = "true"
+    "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
 
-    }
+  }
 }
 
 data "aws_caller_identity" "current" {}

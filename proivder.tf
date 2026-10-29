@@ -5,7 +5,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 6.20"  # Cập nhật lên AWS Provider 7.x
+      version = ">= 6.20" # Cập nhật lên AWS Provider 7.x
     }
     helm = {
       source  = "hashicorp/helm"
@@ -16,8 +16,8 @@ terraform {
       version = "~> 2.38.0" # Cập nhật lên Kubernetes Provider 3.x
     }
     kubectl = {
-        source  = "gavinbunney/kubectl"
-        version = "~> 1.14"
+      source  = "gavinbunney/kubectl"
+      version = "~> 1.14"
     }
   }
 
@@ -28,34 +28,26 @@ provider "aws" {
 }
 
 
-data "aws_eks_cluster" "cluster" {
-  name = module.eks.cluster_name
-  depends_on = [ module.eks ]
-}
-
-data "aws_eks_cluster_auth" "cluster" {
-  name = module.eks.cluster_name
-  depends_on = [ module.eks ]
-  
-}
-
+# Xác thực tới EKS bằng `aws eks get-token` (token luôn mới, không phụ thuộc ~/.kube/config).
+# Lần đầu dựng cụm: terraform apply -target=module.eks, sau đó terraform apply.
 provider "kubernetes" {
-  host                   = data.aws_eks_cluster.cluster.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.cluster.token
-  config_path    = "~/.kube/config" 
-
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", "ap-southeast-1"]
+  }
 }
 
 provider "helm" {
   kubernetes {
-    host                   = data.aws_eks_cluster.cluster.endpoint
-    cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
-    token                  = data.aws_eks_cluster_auth.cluster.token
-    config_path    = "~/.kube/config" 
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", "ap-southeast-1"]
+    }
   }
-
 }
-
-
-

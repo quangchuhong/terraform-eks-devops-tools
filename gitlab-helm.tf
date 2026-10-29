@@ -1,10 +1,10 @@
 # 1. Cài đặt GitLab bằng Helm
 resource "helm_release" "gitlab" {
-  name       = "gitlab"
-  repository = "https://charts.gitlab.io/"
-  chart      = "gitlab"
-  version    = "9.11.5"
-  namespace  = "gitlab"
+  name             = "gitlab"
+  repository       = "https://charts.gitlab.io/"
+  chart            = "gitlab"
+  version          = "9.11.5"
+  namespace        = "gitlab"
   create_namespace = true
 
   values = [
@@ -13,7 +13,7 @@ resource "helm_release" "gitlab" {
 
   set {
     name  = "global.hosts.domain"
-    value = "gitlabonlinecom.click"
+    value = local.domain
   }
 
   set {
@@ -21,20 +21,20 @@ resource "helm_release" "gitlab" {
     value = "quang.hong.0991@gmail.com"
   }
 
-  timeout    = 600 # 10 phút (mặc định: 300s)
+  timeout = 600 # 10 phút (mặc định: 300s)
 
 
-  depends_on = [ module.eks, module.eks.eks_managed_node_group,
-                helm_release.lb_controller, helm_release.cluster_autoscaler,
-                helm_release.metrics_server_release
-             ]
+  depends_on = [module.eks, module.eks.eks_managed_node_group,
+    helm_release.lb_controller, helm_release.cluster_autoscaler,
+    helm_release.metrics_server_release
+  ]
 }
 
 # gitlab-runner:
 
 data "aws_eks_cluster" "this" {
-  name = module.eks.cluster_name
-  depends_on = [ module.eks ]
+  name       = module.eks.cluster_name
+  depends_on = [module.eks]
 }
 
 data "aws_iam_openid_connect_provider" "eks" {
@@ -165,181 +165,69 @@ data "kubernetes_ingress_v1" "gitlab" {
 }
 
 
+locals {
+  domain = "gitlabonlinecom.click"
+}
+
 variable "route53_zone_id" {
   type        = string
-  description = "Route53 Hosted Zone ID (ví dụ: Z1ABC234DEFG56)"
-  default     = "Z08613522NHM48MOSOSYV"
+  description = "Route53 Hosted Zone ID của gitlabonlinecom.click (account 545983214264)"
+  default     = "Z09980543QQOFQHVARDDQ"
+}
+
+# ALB do AWS Load Balancer Controller tạo bất đồng bộ SAU khi helm_release.gitlab xong,
+# nên lần apply đầu chưa tìm được ALB. Apply 2 lượt:
+#   1) terraform apply                                  (enable_dns_records = false)
+#   2) kubectl get ingress -n gitlab → có ADDRESS
+#      terraform apply -var enable_dns_records=true
+variable "enable_dns_records" {
+  type        = bool
+  description = "Tạo bản ghi Route 53 trỏ về ALB (bật ở lượt apply thứ 2, khi ALB đã tồn tại)"
+  default     = false
+}
+
+variable "app_hostnames" {
+  type        = list(string)
+  description = "Các subdomain trỏ về ALB dùng chung (group alb-apps)"
+  default = [
+    "gitlab", "registry", "minio", "kas",
+    "grafana", "prometheus", "alertmanager",
+    "nexus", "docker", "docker-proxy", "docker-internal",
+    "jenkins", "argocd", "sonarqube", "jirasm",
+  ]
 }
 
 data "aws_lb" "selected" {
- #name = "gitlab-webservice-default"  # Thay thế bằng tên ALB của bạn
- tags = {
+  count = var.enable_dns_records ? 1 : 0
+
+  tags = {
     Environment = "prod"
     Application = "gitlab-alb"
   }
 
-  depends_on = [helm_release.gitlab ]
+  depends_on = [helm_release.gitlab]
 }
 
-
-# Lấy Zone ID (Canonical Hosted Zone ID)
+# Zone ID (Canonical Hosted Zone ID) của ALB
 output "alb_zone_id" {
-  value = data.aws_lb.selected.zone_id
+  value = one(data.aws_lb.selected[*].zone_id)
 }
 
-
-# Lấy DNS name của ALB
+# DNS name của ALB
 output "alb_dns_name" {
-  value = data.aws_lb.selected.dns_name
+  value = one(data.aws_lb.selected[*].dns_name)
 }
 
+resource "aws_route53_record" "apps" {
+  for_each = var.enable_dns_records ? toset(var.app_hostnames) : toset([])
 
-
-# 5. Tạo Route53 Record
-resource "aws_route53_record" "gitlab" {
   zone_id = var.route53_zone_id
-  name    = "gitlab.gitlabonlinecom.click"
+  name    = "${each.key}.${local.domain}"
   type    = "A"
 
   alias {
-    #name                   = "dualstack.${data.kubernetes_ingress_v1.gitlab.status[0].load_balancer[0].ingress[0].hostname}"
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id                  
-    evaluate_target_health = true
-  }
-}
-
-
-resource "aws_route53_record" "grafana" {
-  zone_id = var.route53_zone_id
-  name    = "grafana.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "prometheus" {
-  zone_id = var.route53_zone_id
-  name    = "prometheus.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "alertmanager" {
-  zone_id = var.route53_zone_id
-  name    = "alertmanager.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "nexus" {
-  zone_id = var.route53_zone_id
-  name    = "nexus.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "jenkins" {
-  zone_id = var.route53_zone_id
-  name    = "jenkins.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "argocd" {
-  zone_id = var.route53_zone_id
-  name    = "argocd.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "sonarqube" {
-  zone_id = var.route53_zone_id
-  name    = "sonarqube.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-
-
-resource "aws_route53_record" "docker" {
-  zone_id = var.route53_zone_id
-  name    = "docker.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "docker-proxy" {
-  zone_id = var.route53_zone_id
-  name    = "docker-proxy.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "docker-internal" {
-  zone_id = var.route53_zone_id
-  name    = "docker-internal.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_route53_record" "jirasm" {
-  zone_id = var.route53_zone_id
-  name    = "jirasm.gitlabonlinecom.click"
-  type    = "A"
-
-  alias {
-    name                   = "dualstack.${data.aws_lb.selected.dns_name}"  
-    zone_id                = data.aws_lb.selected.zone_id
+    name                   = "dualstack.${data.aws_lb.selected[0].dns_name}"
+    zone_id                = data.aws_lb.selected[0].zone_id
     evaluate_target_health = true
   }
 }
