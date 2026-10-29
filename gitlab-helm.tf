@@ -4,17 +4,47 @@ resource "helm_release" "gitlab" {
   repository       = "https://charts.gitlab.io/"
   chart            = "gitlab"
   version          = var.gitlab_chart_version
-  namespace        = "gitlab"
-  create_namespace = true
+  namespace        = kubernetes_namespace_v1.gitlab.metadata[0].name
+  create_namespace = false
 
   values = [
     file("${path.module}/helm-chart/gitlab-values.yaml"),
-    # Giá trị phụ thuộc account: subnet của ALB lấy từ var.subnet_ids
+    # Giá trị phụ thuộc account/hạ tầng (gitlab-backend.tf)
     yamlencode({
       global = {
         ingress = {
           annotations = {
             "alb.ingress.kubernetes.io/subnets" = join(", ", var.subnet_ids)
+          }
+        }
+        psql = {
+          host = aws_db_instance.gitlab.address
+        }
+        redis = {
+          host = aws_elasticache_replication_group.gitlab.primary_endpoint_address
+        }
+        serviceAccount = {
+          annotations = {
+            "eks.amazonaws.com/role-arn" = aws_iam_role.gitlab_s3.arn
+          }
+        }
+        registry = {
+          bucket = local.gitlab_buckets["registry"]
+        }
+        appConfig = {
+          lfs              = { bucket = local.gitlab_buckets["lfs"] }
+          artifacts        = { bucket = local.gitlab_buckets["artifacts"] }
+          uploads          = { bucket = local.gitlab_buckets["uploads"] }
+          packages         = { bucket = local.gitlab_buckets["packages"] }
+          externalDiffs    = { bucket = local.gitlab_buckets["mr-diffs"] }
+          terraformState   = { bucket = local.gitlab_buckets["terraform-state"] }
+          ciSecureFiles    = { bucket = local.gitlab_buckets["ci-secure-files"] }
+          dependencyProxy  = { bucket = local.gitlab_buckets["dependency-proxy"] }
+          agentPlanContent = { bucket = local.gitlab_buckets["agent-plan-content"] }
+          ciCatalogBundles = { bucket = local.gitlab_buckets["ci-catalog-bundles"] }
+          backups = {
+            bucket    = local.gitlab_buckets["backups"]
+            tmpBucket = local.gitlab_buckets["tmp"]
           }
         }
       }
@@ -26,16 +56,14 @@ resource "helm_release" "gitlab" {
     value = var.domain
   }
 
-  set {
-    name  = "certmanager-issuer.email"
-    value = "quang.hong.0991@gmail.com"
-  }
-
-  timeout = 600 # 10 phút (mặc định: 300s)
+  timeout = 900 # 15 phút: lần cài đầu chạy migrations trên RDS
 
   depends_on = [module.eks, module.eks.eks_managed_node_group,
     helm_release.lb_controller, helm_release.cluster_autoscaler,
-    helm_release.metrics_server_release
+    helm_release.metrics_server_release,
+    kubernetes_secret_v1.gitlab_postgresql, kubernetes_secret_v1.gitlab_redis,
+    kubernetes_secret_v1.gitlab_rails_storage, kubernetes_secret_v1.gitlab_registry_storage,
+    aws_iam_role_policy.gitlab_s3, aws_s3_bucket.gitlab
   ]
 }
 
@@ -163,7 +191,7 @@ resource "aws_iam_role_policy_attachment" "gitlab_runner_deploy_attach" {
 data "kubernetes_ingress_v1" "gitlab" {
   metadata {
     name      = "gitlab-webservice-default" # Tên Ingress do GitLab chart tạo
-    namespace = "gitlab"
+    namespace = kubernetes_namespace_v1.gitlab.metadata[0].name
   }
 
   depends_on = [helm_release.gitlab]

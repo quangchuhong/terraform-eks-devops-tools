@@ -1,14 +1,26 @@
+# GitLab chart 10.x (GitLab 19) trên EKS, ALB Ingress, chỉ HTTP.
+# Các giá trị phụ thuộc hạ tầng (domain, subnet ALB, endpoint RDS/Redis, bucket S3,
+# IAM role) được Terraform truyền vào ở gitlab-helm.tf; secret tạo ở gitlab-backend.tf.
 global:
-  edition: ce  # Quan trọng: Chỉ định bản CE
+  edition: ce
   hosts:
-    domain: gitlabonlinecom.click  # Terraform ghi đè bằng var.domain (gitlab-helm.tf)
-    https: false  # Chỉ dùng HTTP (ALB nghe cổng 80, không có 443)
+    domain: gitlabonlinecom.click  # Terraform ghi đè bằng var.domain
+    https: false                   # Chỉ HTTP (ALB nghe cổng 80, không có 443)
+
+  # Chart 10.x mặc định dùng Gateway API + Envoy Gateway → tắt, dùng Ingress của ALB
+  gatewayApi:
+    enabled: false
+    installEnvoy: false
+
   ingress:
-    configureCertmanager: false  # TLS không dùng → không cần cert-manager
-    name: gitlab-alb-apps
+    enabled: true
+    provider: aws
+    class: alb
+    configureCertmanager: false
     tls:
       enabled: false
-    class: alb
+    path: /
+    pathType: Prefix
     annotations:
       alb.ingress.kubernetes.io/group.name: alb-apps
       alb.ingress.kubernetes.io/scheme: internet-facing
@@ -18,94 +30,71 @@ global:
       alb.ingress.kubernetes.io/target-type: ip
       alb.ingress.kubernetes.io/success-codes: "200-399"
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-      # Bật HTTPS sau: thêm {"HTTPS":443} vào listen-ports, certificate-arn (ACM của account mới) và ssl-redirect
-      # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:<ACCOUNT_ID>:certificate/<ID>"
-      # alb.ingress.kubernetes.io/ssl-redirect: "443"
-      # alb.ingress.kubernetes.io/subnets: Terraform đặt từ var.subnet_ids (gitlab-helm.tf)
+      # Bật HTTPS sau: thêm {"HTTPS":443} vào listen-ports, certificate-arn (ACM) và ssl-redirect
+      # alb.ingress.kubernetes.io/subnets: Terraform đặt từ var.subnet_ids
       alb.ingress.kubernetes.io/tags: "Environment=prod,Application=gitlab-alb"
 
-certmanager-issuer:
-  email: quang.hong.0991@gmail.com
+  # PostgreSQL: Amazon RDS (host do Terraform truyền vào)
+  psql:
+    port: 5432
+    database: gitlabhq_production
+    username: gitlab
+    password:
+      secret: gitlab-postgresql-password
+      key: postgresql-password
 
-# 1. Webservice (UI/API), add them extraEnv fix loi access login qua http
+  # Redis: Amazon ElastiCache, mã hoá đường truyền → rediss (host do Terraform truyền vào)
+  redis:
+    port: 6379
+    scheme: rediss
+    auth:
+      enabled: true
+      secret: gitlab-redis-secret
+      key: redis-password
+
+  # Object storage: S3 qua IAM role (IRSA) gắn vào mọi ServiceAccount của chart
+  serviceAccount:
+    enabled: true
+    create: true
+
+  appConfig:
+    object_store:
+      enabled: true
+      proxy_download: true
+      connection:
+        secret: gitlab-rails-storage
+        key: connection
+    externalDiffs:
+      enabled: true
+    terraformState:
+      enabled: true
+    ciSecureFiles:
+      enabled: true
+    dependencyProxy:
+      enabled: true
+    backups:
+      objectStorage:
+        backend: s3
+
+# Container Registry lưu image trên S3
+registry:
+  storage:
+    secret: gitlab-registry-storage
+    key: config
+
 gitlab:
   webservice:
-    ingress:
-      paths:
-        - path: /
-          pathType: Prefix
     service:
-      port: 8080
       type: ClusterIP
-    extraEnv:
-      GITLAB_TRUSTED_PROXIES: "0.0.0.0/0,::/0"
-      GITLAB_OMNIBUS_CONFIG: |
-        nginx['real_ip_trusted_addresses'] = ['0.0.0.0/0', '::/0']
-        nginx['real_ip_header'] = 'X-Forwarded-For'
-        nginx['real_ip_recursive'] = 'on'
-        rails['relative_url_root'] = '/'
-        gitlab_rails['gitlab_rails_env'] = "production"
-        gitlab_rails['session_store_secure'] = false  
-
-
-# 3. Gitaly (Git Storage)
   gitaly:
     persistence:
       storageClass: "gp3"
+  # Backup: backup-utility --s3tool awscli (IRSA, không cần s3cmd.config)
 
-# 4. PostgreSQL
-postgresql:
-  production: true
-  postgresql:
-    maxConnections: 500
-  persistence:
-    storageClass: "gp3"
-    size: "10Gi"
-  resources:
-    requests:
-      memory: "320Mi"
-      cpu: "200m"
-    limits:
-      memory: "640Mi"
-      cpu: "400m"
-
-# 5. Redis
-redis:
-  master:
-    persistence:
-      storageClass: "gp3"
-      size: "500Mi"
-    resources:
-      requests:
-        memory: "450Mi"
-        cpu: "500m"
-      limits:
-        memory: "650Mi"
-        cpu: "800m"
-
-  registry:
-    ingress:
-      paths:
-        - path: /registry/*
-          pathType: Prefix
-    service:
-      port: 5000
-      type: ClusterIP
-
-  minio:
-    ingress:
-      paths:
-        - path: /minio/*
-          pathType: Prefix
-    service:
-      port: 9000
-      type: ClusterIP
-
-# Tắt các components không cần thiết
+# Tắt các thành phần không dùng
 nginx-ingress:
   enabled: false
 
-# Không cài cert-manager đi kèm chart (chỉ dùng HTTP; khi bật HTTPS dùng ACM trên ALB)
 installCertmanager: false
 
 gitlab-pages:
@@ -115,10 +104,7 @@ mattermost:
   enabled: false
 
 prometheus:
-  install: false  
-
-alertmanager:
-  enabled: false 
+  install: false
 
 gitlab-runner:
   install: false

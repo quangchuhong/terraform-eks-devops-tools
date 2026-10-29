@@ -65,7 +65,44 @@ variable "helm_chart_version" {
 variable "gitlab_chart_version" {
   type        = string
   description = "Version Helm chart gitlab/gitlab"
-  default     = "9.11.16" # GitLab v18.11.14 (critical patch)
+  default     = "10.5.4" # GitLab v19.5.3 (cần PostgreSQL/Redis/S3 ngoài: gitlab-backend.tf)
+}
+
+# Dịch vụ ngoài của GitLab (gitlab-backend.tf)
+variable "gitlab_db_engine_version" {
+  description = "Phiên bản PostgreSQL của RDS (GitLab 19 yêu cầu 17)"
+  type        = string
+  default     = "17"
+}
+
+variable "gitlab_db_instance_class" {
+  description = "Loại instance RDS cho GitLab"
+  type        = string
+  default     = "db.t4g.medium"
+}
+
+variable "gitlab_db_allocated_storage" {
+  description = "Dung lượng RDS ban đầu (GB); tự tăng tối đa gấp 4"
+  type        = number
+  default     = 50
+}
+
+variable "gitlab_db_deletion_protection" {
+  description = "Chặn xoá RDS và giữ snapshot cuối khi xoá (bật cho môi trường thật)"
+  type        = bool
+  default     = false
+}
+
+variable "gitlab_redis_node_type" {
+  description = "Loại node ElastiCache Redis cho GitLab"
+  type        = string
+  default     = "cache.t4g.small"
+}
+
+variable "gitlab_s3_force_destroy" {
+  description = "Cho phép terraform destroy xoá cả bucket còn dữ liệu (chỉ nên bật khi lab)"
+  type        = bool
+  default     = false
 }
 
 # ---------- DNS / Route 53 ----------
