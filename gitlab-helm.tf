@@ -13,7 +13,7 @@ resource "helm_release" "gitlab" {
 
   set {
     name  = "global.hosts.domain"
-    value = local.domain
+    value = var.domain
   }
 
   set {
@@ -159,8 +159,10 @@ data "kubernetes_ingress_v1" "gitlab" {
   depends_on = [helm_release.gitlab]
 }
 
-locals {
-  domain = "gitlabonlinecom.click"
+# Hosted zone public của domain (tự tạo khi đăng ký domain qua Route 53)
+data "aws_route53_zone" "main" {
+  name         = var.domain
+  private_zone = false
 }
 
 # Bật/tắt bằng var.enable_dns_records (xem variables.tf)
@@ -188,8 +190,8 @@ output "alb_dns_name" {
 resource "aws_route53_record" "apps" {
   for_each = var.enable_dns_records ? toset(var.app_hostnames) : toset([])
 
-  zone_id = var.route53_zone_id
-  name    = "${each.key}.${local.domain}"
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "${each.key}.${var.domain}"
   type    = "A"
 
   alias {

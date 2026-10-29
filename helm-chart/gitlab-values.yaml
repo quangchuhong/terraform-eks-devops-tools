@@ -1,7 +1,7 @@
 global:
   edition: ce  # Quan trọng: Chỉ định bản CE
   hosts:
-    domain: gitlabonlinecom.click 
+    domain: gitlabonlinecom.click  # Terraform ghi đè bằng var.domain (gitlab-helm.tf)
     https: false  # Chỉ dùng HTTP (ALB nghe cổng 80, không có 443)
   ingress:
     configureCertmanager: false  # TLS không dùng → không cần cert-manager

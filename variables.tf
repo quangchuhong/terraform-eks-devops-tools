@@ -43,10 +43,14 @@ variable "helm_chart_version" {
 }
 
 # ---------- DNS / Route 53 ----------
-variable "route53_zone_id" {
+# Domain gốc cho mọi app (gitlab.<domain>, nexus.<domain>, ...).
+# Domain phải được đăng ký / có hosted zone public trong account đang chạy Terraform;
+# hosted zone được tìm theo tên (data "aws_route53_zone" "main"), không cần điền zone ID.
+# Đổi domain: đặt `domain = "<domain-moi>"` trong terraform.tfvars rồi terraform apply.
+variable "domain" {
   type        = string
-  description = "Route53 Hosted Zone ID của gitlabonlinecom.click (account 545983214264)"
-  default     = "Z09980543QQOFQHVARDDQ"
+  description = "Domain gốc của các DevOps tool (hosted zone public cùng tên phải tồn tại)"
+  default     = "gitlabonlinecom.click"
 }
 
 # ALB do AWS Load Balancer Controller tạo bất đồng bộ SAU khi helm_release.gitlab xong,
