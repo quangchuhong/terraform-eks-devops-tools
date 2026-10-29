@@ -30,20 +30,20 @@ module "eks" {
   # Optional: Adds the current caller identity as an administrator via cluster access entry
   enable_cluster_creator_admin_permissions = true
 
-  # Người chạy Terraform (IAM user quangch.cloud.10) đã có quyền admin nhờ
-  # enable_cluster_creator_admin_permissions ở trên.
-  # Access entry chỉ nhận IAM user/role, không nhận ":root" → thêm role admin khác tại đây nếu cần:
-  # access_entries = {
-  #   admin_role = {
-  #     principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/<AdminRole>"
-  #     policy_associations = {
-  #       admin_policy = {
-  #         policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-  #         access_scope = { type = "cluster" }
-  #       }
-  #     }
-  #   }
-  # }
+  # Người chạy Terraform đã là admin nhờ enable_cluster_creator_admin_permissions.
+  # Thêm admin khác (IAM user/role dùng cho Console...) qua var.cluster_admin_arns.
+  # Lưu ý: không thêm chính người tạo cụm (trùng access entry) và không dùng ":root".
+  access_entries = {
+    for arn in var.cluster_admin_arns : replace(element(split("/", arn), length(split("/", arn)) - 1), ".", "-") => {
+      principal_arn = arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
 
   vpc_id                   = var.vpc_id
   subnet_ids               = var.subnet_ids
