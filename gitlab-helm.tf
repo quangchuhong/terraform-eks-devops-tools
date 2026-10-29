@@ -193,7 +193,7 @@ variable "app_hostnames" {
     "gitlab", "registry", "minio", "kas",
     "grafana", "prometheus", "alertmanager",
     "nexus", "docker", "docker-proxy", "docker-internal",
-    "jenkins", "argocd", "sonarqube", "jirasm",
+    "jenkins", "argocd", "sonarqube", "trivy", "jirasm",
   ]
 }
 
