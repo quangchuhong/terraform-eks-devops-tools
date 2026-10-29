@@ -8,7 +8,17 @@ resource "helm_release" "gitlab" {
   create_namespace = true
 
   values = [
-    file("${path.module}/helm-chart/gitlab-values.yaml")
+    file("${path.module}/helm-chart/gitlab-values.yaml"),
+    # Giá trị phụ thuộc account: subnet của ALB lấy từ var.subnet_ids
+    yamlencode({
+      global = {
+        ingress = {
+          annotations = {
+            "alb.ingress.kubernetes.io/subnets" = join(", ", var.subnet_ids)
+          }
+        }
+      }
+    })
   ]
 
   set {
@@ -159,11 +169,6 @@ data "kubernetes_ingress_v1" "gitlab" {
   depends_on = [helm_release.gitlab]
 }
 
-# Hosted zone public của domain (tự tạo khi đăng ký domain qua Route 53)
-data "aws_route53_zone" "main" {
-  name         = var.domain
-  private_zone = false
-}
 
 # Bật/tắt bằng var.enable_dns_records (xem variables.tf)
 data "aws_lb" "selected" {
@@ -190,7 +195,7 @@ output "alb_dns_name" {
 resource "aws_route53_record" "apps" {
   for_each = var.enable_dns_records ? toset(var.app_hostnames) : toset([])
 
-  zone_id = data.aws_route53_zone.main.zone_id
+  zone_id = aws_route53_zone.main.zone_id
   name    = "${each.key}.${var.domain}"
   type    = "A"
 

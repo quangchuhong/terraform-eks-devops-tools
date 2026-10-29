@@ -3,7 +3,7 @@
 # không cần DynamoDB.
 terraform {
   backend "s3" {
-    bucket       = "tfstate-545983214264-ap-southeast-1"
+    bucket       = "tfstate-609320954321-ap-southeast-1" # account 609320954321
     key          = "eks-devops-tools/terraform.tfstate"
     region       = "ap-southeast-1"
     encrypt      = true

@@ -27,6 +27,12 @@ provider "aws" {
   region = "ap-southeast-1"
 }
 
+# Route 53 Domains (đăng ký domain) chỉ có endpoint ở us-east-1
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
 
 # Xác thực tới EKS bằng `aws eks get-token` (token luôn mới, không phụ thuộc ~/.kube/config).
 # Lần đầu dựng cụm: terraform apply -target=module.eks, sau đó terraform apply.

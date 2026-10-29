@@ -10,16 +10,18 @@ variable "oidc_provider_arn" {
   default     = ""
 }
 
+# VPC/subnet của account 609320954321 (default VPC, subnet public ở 3 AZ).
+# Subnet dùng chung cho node EKS và ALB internet-facing → phải là subnet PUBLIC.
 variable "vpc_id" {
-  description = "vpc_id"
+  description = "VPC chạy EKS"
   type        = string
-  default     = "vpc-03fb9f55496d71836"
+  default     = "vpc-0a7f2229b36e6ceb5"
 }
 
 variable "subnet_ids" {
-  description = "subnet_ids"
+  description = "Subnet public cho node EKS, control plane ENI và ALB"
   type        = list(string)
-  default     = ["subnet-0189d8013dc13f181", "subnet-012955c7d5094705c", "subnet-0c403ad0b306974dc"]
+  default     = ["subnet-0729b4d3570c85035", "subnet-01e7b81b2c34fbaae", "subnet-063d005e791e4932f"]
 }
 
 # ---------- Region ----------
@@ -44,13 +46,20 @@ variable "helm_chart_version" {
 
 # ---------- DNS / Route 53 ----------
 # Domain gốc cho mọi app (gitlab.<domain>, nexus.<domain>, ...).
-# Domain phải được đăng ký / có hosted zone public trong account đang chạy Terraform;
-# hosted zone được tìm theo tên (data "aws_route53_zone" "main"), không cần điền zone ID.
-# Đổi domain: đặt `domain = "<domain-moi>"` trong terraform.tfvars rồi terraform apply.
+# Terraform tạo hosted zone public cho domain này (dns.tf).
 variable "domain" {
   type        = string
-  description = "Domain gốc của các DevOps tool (hosted zone public cùng tên phải tồn tại)"
+  description = "Domain gốc của các DevOps tool"
   default     = "gitlabonlinecom.click"
+}
+
+# true: domain được đăng ký bằng Route 53 trong CÙNG account → Terraform tự trỏ
+# name server của domain về hosted zone (aws_route53domains_registered_domain).
+# false: domain đăng ký ở nơi khác → tự trỏ NS theo output `name_servers`.
+variable "manage_domain_nameservers" {
+  type        = bool
+  description = "Terraform quản lý name server của domain đăng ký bằng Route 53 trong account này"
+  default     = true
 }
 
 # ALB do AWS Load Balancer Controller tạo bất đồng bộ SAU khi helm_release.gitlab xong,

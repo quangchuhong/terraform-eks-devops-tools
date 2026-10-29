@@ -21,8 +21,7 @@ global:
       # Bật HTTPS sau: thêm {"HTTPS":443} vào listen-ports, certificate-arn (ACM của account mới) và ssl-redirect
       # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:<ACCOUNT_ID>:certificate/<ID>"
       # alb.ingress.kubernetes.io/ssl-redirect: "443"
-      # Subnet PUBLIC (route 0.0.0.0/0 → IGW) của VPC chạy EKS
-      alb.ingress.kubernetes.io/subnets: subnet-0189d8013dc13f181, subnet-012955c7d5094705c, subnet-0c403ad0b306974dc
+      # alb.ingress.kubernetes.io/subnets: Terraform đặt từ var.subnet_ids (gitlab-helm.tf)
       alb.ingress.kubernetes.io/tags: "Environment=prod,Application=gitlab-alb"
 
 certmanager-issuer:

@@ -3,10 +3,10 @@ resource "helm_release" "metrics_server_release" {
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
   chart      = "metrics-server"
   namespace  = "kube-system"
-  depends_on = [ module.eks ]   
+  depends_on = [module.eks]
 }
 
 output "metrics_server_helm_metadata" {
   description = "Metadata Block outlining status of the deployed release."
-  value = helm_release.metrics_server_release.metadata
+  value       = helm_release.metrics_server_release.metadata
 }
