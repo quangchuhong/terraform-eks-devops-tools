@@ -1,0 +1,13 @@
+node:
+  initContainers:
+    - name: create-efs-dir
+      image: busybox
+      command: ["sh", "-c", "mkdir -p /var/run/efs && chmod 777 /var/run/efs"]
+      volumeMounts:
+        - name: efs-dir
+          mountPath: /var/run/efs
+  volumes:
+    - name: efs-dir
+      hostPath:
+        path: /var/run/efs
+        type: DirectoryOrCreate

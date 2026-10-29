@@ -1,0 +1,188 @@
+namespaces:
+  nexusNs:
+    enabled: false
+    name: "nexus"
+
+image:
+  repository: sonatype/nexus3
+  tag: 3.85.0
+  pullPolicy: IfNotPresent
+
+fluentbit:
+  enabled: false #set this to true to enable sending of logs to CloudWatch
+
+aws:
+  enabled: false #set to true to enable aws specific yamls like external dns and fluent bit
+  clusterRegion: ap-southeast-1
+  secretmanager:
+    enabled: false
+
+nexus:
+  # Thêm JVM options vào đây
+  javaOpts: "-Dnexus.license.autoInstall=false -Xms1024m -Xmx1024m"
+  # Tắt automated license installer nếu cần
+  licensing:
+      enabled: false
+
+statefulset:
+  clusterRegion: ap-southeast-1
+  name: nxrm-statefulset
+  clusterName: nxrm-nexus
+  logsRegion: ap-southeast-1
+  fluentBitVersion: 2.28.0
+  replicaCount: 3
+  initContainer:
+    image:
+      repository: busybox
+      tag: 1.33.1
+    resources:
+      limits:
+        cpu: "0.2"
+        memory: "512Mi"
+      requests:
+        cpu: "0.1"
+        memory: "256Mi"
+  container:
+    image:
+      repository: sonatype/nexus3
+      tag: 3.85.0
+    resources:
+      # See help documentation, these are minimum sysem requirements
+      requests:
+        cpu: 0.5
+        memory: "0.5Gi"
+      limits:
+        cpu: 1
+        memory: "1Gi"
+    containerPort: 8081
+    pullPolicy: IfNotPresent
+    env:
+      nexusDBName: nexus
+      nexusDBPort: 3306
+      install4jAddVmParams: "-Xms2703m -Xmx2703m"
+  requestLogContainer:
+    image:
+      repository: busybox
+      tag: 1.33.1
+    resources:
+      limits:
+        cpu: "0.2"
+        memory: "512Mi"
+      requests:
+        cpu: "0.1"
+        memory: "256Mi"
+  auditLogContainer:
+    image:
+      repository: busybox
+      tag: 1.33.1
+    resources:
+      limits:
+        cpu: "0.2"
+        memory: "512Mi"
+      requests:
+        cpu: "0.1"
+        memory: "256Mi"
+  taskLogContainer:
+    image:
+      repository: busybox
+      tag: 1.33.1
+    resources:
+      limits:
+        cpu: "0.2"
+        memory: "512Mi"
+      requests:
+        cpu: "0.1"
+        memory: "256Mi"
+  startupProbe: # Allow up to 30 minutes for the container to finish any pending DB migration. Once the startup probe succeeds the liveness- and readiness probes get activated (no need for initialDelaySeconds).
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 180
+    path: /
+  livenessProbe:
+    initialDelaySeconds: 0
+    periodSeconds: 60
+    timeoutSeconds: 1
+    failureThreshold: 6
+    path: /
+  readinessProbe:
+    initialDelaySeconds: 0
+    periodSeconds: 60
+    timeoutSeconds: 1
+    failureThreshold: 6
+    path: /
+
+serviceAccount:
+  enable: false
+  name: nexus-sa #This service account in managed by Helm
+
+
+service:
+  type: ClusterIP
+  port: 8081
+
+ingress:
+  enabled: true
+  name: nexus-ingress
+  ingressClassName: alb
+  annotations:
+    alb.ingress.kubernetes.io/group.name: alb-apps
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/success-codes: "200-399"
+    alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
+  defaultRule: false
+  additionalRules: 
+    - host: nexus.gitlabonlinecom.click
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nexus-nxrm-ha-hl
+                port:
+                  number: 8081
+
+persistence:
+  enabled: true
+  storageClass: efs-sc
+  accessMode: ReadWriteMany
+  size: 20Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+secret:
+  secretProviderClass: "aws-secrets-provider"
+  provider: aws
+  dbSecret:
+    enabled: false # Enable to apply database-secret.yaml which allows you to specify db credentials
+  db:
+    user: nxrm_db_user
+    userAlias: db_user
+    password: nxrm_db_password
+    passwordAlias: db_password
+    host: nxrm_db_host
+    hostAlias: db_host
+  # -- Use an existing secret for the database variables: DB_NAME, DB_HOST, DB_USER, DB_PASSWORD
+  existingDbSecret:
+    # -- Enabled the use of an already created secret, you need to uncomment the values from additionalEnv
+    enabled: true
+  nexusAdmin:
+    name: "nexusAdminPassword"
+    alias: "admin-nxrm-password-alias"
+  nexusAdminSecret:
+    enabled: true # Enable to apply nexus-admin-secret.yaml which allows you to the initial admin password for nexus repository
+    adminPassword: yourinitialnexuspassword #You should change this when you login for the first time
+
+
+
+
+
+
+
+

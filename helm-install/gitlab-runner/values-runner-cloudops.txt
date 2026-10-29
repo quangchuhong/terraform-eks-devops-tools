@@ -1,0 +1,52 @@
+gitlabUrl: "http://gitlab.gitlabonlinecom.click/"
+runnerRegistrationToken: "" #"<GROUP_TOKEN_CLOUDOPS>"
+
+runners:
+  executor: "kubernetes"
+  namespace: "gitlab"
+  tags: "cloudops,eks,k8s,maven17"
+  image: "maven:3.9-eclipse-temurin-17"
+  privileged: false
+  pollTimeout: 600
+  concurrent: 10
+
+  resources:
+    limits:
+      memory: 500Mi
+      cpu: "500m"
+    requests:
+      memory: 256Mi
+      cpu: "250m"
+
+serviceAccount:
+  create: true
+  name: "gitlab-runner-cloudops"
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::609320954321:role/eks-gitlab-runner-role"
+
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+      scaleUp:
+        stabilizationWindowSeconds: 60
+
+
+  # # Nếu muốn dùng cache S3:
+  # cache:
+  #   type: "s3"
+  #   shared: true
+  #   s3:
+  #     bucketName: "gitlab-runner-cache-local"
+  #     bucketLocation: "ap-southeast-1"
+

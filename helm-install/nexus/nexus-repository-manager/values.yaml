@@ -1,0 +1,139 @@
+statefulset:
+  # This is not supported
+  enabled: false
+deploymentStrategy: Recreate
+
+image:
+  # Sonatype Official Public Image
+  repository: sonatype/nexus3
+  tag: 3.68.1
+  pullPolicy: IfNotPresent
+imagePullSecrets:
+# for image registries that require login, specify the name of the existing
+# kubernetes secret
+#   - name: <pull-secret-name>
+
+nexus:
+  env:
+    - name: INSTALL4J_ADD_VM_PARAMS
+      value: "-Xms1024m -Xmx2048m -Dnexus.scripts.allowCreation=true"
+
+    - name: NEXUS_LOG_LEVEL
+      value: "DEBUG"
+
+    # Cấu hình S3 Blob Store
+    # - name: NEXUS_BLOB_STORE_CONFIG
+    #   value: |
+    #     {
+    #       "type": "s3",
+    #       "name": "s3-blobstore",
+    #       "config": {
+    #         "bucket": "nexus-data-bucket-s3",
+    #         "region": "ap-southeast-1",
+    #         "expiration": 0
+    #       }
+    #     }
+    - name: JAVA_OPTS
+      value: >-
+        -Djava.util.prefs.userRoot=/dev/null
+        -Djava.util.prefs.systemRoot=/dev/null
+        -Djava.util.prefs.PreferencesFactory=org.apache.jackrabbit.core.util.TransientPreferencesFactory
+        -Xms2703M -Xmx2703M -XX:MaxDirectMemorySize=2703M -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
+
+    - name: INSTALL4J_ADD_VM_PARAMS
+      value: >-
+        -Dstorage.wal.syncOnPageFlush=true
+        -Dstorage.diskCache.bufferSize=1024
+        -Dstorage.lockFile=/nexus-data/db/nexus.lock
+
+  securityContext:
+    runAsUser: 200
+    runAsGroup: 200
+    fsGroup: 200
+  podAnnotations: {}
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 8081
+    initialDelaySeconds: 300
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 6
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 8081
+    initialDelaySeconds: 300
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 6
+
+
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+
+  extraInitContainers:
+    - name: fix-permissions
+      image: busybox
+      command: ["sh", "-c", "chown -R 200:200 /nexus-data && chmod -R 755 /nexus-data"]
+      securityContext:
+        runAsUser: 0
+      volumeMounts:
+        - name: nexus-data
+          mountPath: /nexus-data
+
+
+extraVolumeMounts:
+  - name: java-prefs
+    mountPath: /nexus-data/.java
+extraVolumes:
+  - name: java-prefs
+    emptyDir: {}
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  storageClass: "gp3"
+  storageSize: 20Gi
+  mountPath: /nexus-data  # Khớp với initContainer
+  volumeName: nexus-data 
+ 
+
+ingress:
+  enabled: true
+  name: nexus-ingress
+  ingressClassName: alb
+  namespace: nexus
+  annotations:
+    alb.ingress.kubernetes.io/group.name: alb-apps
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: / 
+    alb.ingress.kubernetes.io/success-codes: "200-399"
+    alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
+  hostRepo: nexus.gitlabonlinecom.click
+  spec:
+    tls: []
+    rules:
+    - host: nexus.gitlabonlinecom.click
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: nexus
+              port:
+                number: 8081
+
+serviceAccount:
+  create: true
+  name: "nexus"
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::609320954321:role/eks-nexus-role"

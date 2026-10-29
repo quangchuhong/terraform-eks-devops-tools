@@ -1,0 +1,15 @@
+server:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false # Tắt ingress mặc định
+
+alertmanager:
+  enabled: false # Tắt alertmanager nếu không cần
+
+pushgateway:
+  enabled: false # Tắt pushgateway nếu không cần
+
+persistence:
+  enabled: true
+  storageClassName: "gp3"

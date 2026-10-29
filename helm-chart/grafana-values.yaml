@@ -1,0 +1,28 @@
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false # Tắt ingress mặc định
+
+persistence:
+  enabled: true
+  storageClassName: "gp3"
+
+grafana.ini:
+  server:
+    protocol : "http"   # Grafana chạy HTTP nội bộ
+    root_url : "http://monitoring.gitlabonlinecom.click/grafana/"
+    serve_from_sub_path: true  # Quan trọng
+
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus-server.monitoring.svc.cluster.local
+      isDefault: true
+      version: 1
+      editable: true

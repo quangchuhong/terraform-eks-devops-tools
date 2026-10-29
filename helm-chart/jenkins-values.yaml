@@ -1,0 +1,96 @@
+controller:
+  image:
+    registry: "docker.io"  # Thêm registry nếu cần
+    repository: "jenkins/jenkins"
+    tag: 
+    imagePullPolicy: "IfNotPresent"
+
+  JCasC:
+      securityRealm: |-
+        local:
+          allowsSignup: false
+          enableCaptcha: false
+          users:
+          - id: "${chart-admin-username}"
+            name: "admin"
+            password: "${chart-admin-password}"
+      authorizationStrategy: |-
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: false
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  serviceAccount:
+    create: false
+    name: "jenkins-controller-sa"
+
+  service:
+    type: "ClusterIP"
+    port: 8080
+    targetPort: 8080
+    nodePort: null
+
+  startupProbe:
+    httpGet:
+      path: /login
+      port: 8080
+    initialDelaySeconds: 60  # Chờ 60 giây trước khi bắt đầu kiểm tra
+    periodSeconds: 10       # Kiểm tra mỗi 10 giây
+    timeoutSeconds: 5       # Timeout cho mỗi lần kiểm tra
+    failureThreshold: 30    # Số lần thử tối đa
+
+  ingress:
+    enabled: true
+    name: jenkins-ingress
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/group.name: alb-apps
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+      alb.ingress.kubernetes.io/success-codes: "200-399"
+      alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
+    hostName: "jenkins.gitlabonlinecom.click"
+    tls: []
+
+  # installPlugins:
+  #   - kubernetes:latest
+  #   - workflow-aggregator:latest
+  #   - git:latest
+  #   - blueocean:latest
+
+  javaOpts: "-Xms512m -Xmx512m -Djenkins.install.runSetupWizard=false"
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: "gp3"
+  size: "20Gi"
+  accessMode: "ReadWriteOnce"
+
+agent:
+  enabled: true
+  image:
+    registry: "docker.io"  # Thêm registry nếu cần
+    repository: "jenkins/inbound-agent"
+    tag: "latest"
+    imagePullPolicy: "IfNotPresent"
+
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  serviceAccount:
+    create: false
+    name: "jenkins-agent-sa"
+

@@ -1,0 +1,15 @@
+gitlabUrl: "http://gitlab.gitlabonlinecom.click/"
+runnerRegistrationToken: "" #"<GROUP_TOKEN_CLOUDOPS>"
+
+runners:
+  executor: "kubernetes"
+  namespace: "gitlab"
+  tags: "devsecops,eks,k8s"
+  image: "python:3.11-slim"
+  privileged: false
+  concurrent: 10
+
+serviceAccount:
+  create: true
+  name: "gitlab-runner-devsecops"
+

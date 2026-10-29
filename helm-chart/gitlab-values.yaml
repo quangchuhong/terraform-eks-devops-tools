@@ -1,0 +1,184 @@
+global:
+  edition: ce  # Quan trọng: Chỉ định bản CE
+  hosts:
+    domain: gitlabonlinecom.click 
+    https: true  # Nếu dùng HTTP
+  ingress:
+    configureCertmanager: true
+    name: gitlab-alb-apps
+    tls:
+      enabled: true
+    class: alb
+    annotations:
+      alb.ingress.kubernetes.io/group.name: alb-apps
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/backend-protocol: HTTP
+      alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=600
+      alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/success-codes: "200-399"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80,"HTTPS":443}]'
+      alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:609320954321:certificate/569f4470-6ac3-4ef2-be6e-7eb012397305"
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
+      alb.ingress.kubernetes.io/tags: "Environment=prod,Application=gitlab-alb"
+
+certmanager-issuer:
+  email: quang.hong.0991@gmail.com
+
+# 1. Webservice (UI/API), add them extraEnv fix loi access login qua http
+gitlab:
+  webservice:
+    ingress:
+      paths:
+        - path: /
+          pathType: Prefix
+    service:
+      port: 8080
+      type: ClusterIP
+    extraEnv:
+      GITLAB_TRUSTED_PROXIES: "0.0.0.0/0,::/0"
+      GITLAB_OMNIBUS_CONFIG: |
+        nginx['real_ip_trusted_addresses'] = ['0.0.0.0/0', '::/0']
+        nginx['real_ip_header'] = 'X-Forwarded-For'
+        nginx['real_ip_recursive'] = 'on'
+        rails['relative_url_root'] = '/'
+        gitlab_rails['gitlab_rails_env'] = "production"
+        gitlab_rails['session_store_secure'] = false  
+
+
+# 3. Gitaly (Git Storage)
+  gitaly:
+    persistence:
+      storageClass: "gp3"
+
+# 4. PostgreSQL
+postgresql:
+  production: true
+  postgresql:
+    maxConnections: 500
+  persistence:
+    storageClass: "gp3"
+    size: "10Gi"
+  resources:
+    requests:
+      memory: "320Mi"
+      cpu: "200m"
+    limits:
+      memory: "640Mi"
+      cpu: "400m"
+
+# 5. Redis
+redis:
+  master:
+    persistence:
+      storageClass: "gp3"
+      size: "500Mi"
+    resources:
+      requests:
+        memory: "450Mi"
+        cpu: "500m"
+      limits:
+        memory: "650Mi"
+        cpu: "800m"
+
+  registry:
+    ingress:
+      paths:
+        - path: /registry/*
+          pathType: Prefix
+    service:
+      port: 5000
+      type: ClusterIP
+
+  minio:
+    ingress:
+      paths:
+        - path: /minio/*
+          pathType: Prefix
+    service:
+      port: 9000
+      type: ClusterIP
+
+# Tắt các components không cần thiết
+nginx-ingress:
+  enabled: false
+
+certmanager:
+  enabled: true
+
+gitlab-pages:
+  enabled: false
+
+mattermost:
+  enabled: false
+
+prometheus:
+  install: false  
+
+alertmanager:
+  enabled: false 
+
+gitlab-runner:
+  install: false
+
+# gitlab-runner:
+#   enabled: true
+#   replicas: 2
+#   nameOverride: "gitlab-runner"
+#   fullnameOverride: "gitlab-runner"
+
+#   gitlabUrl: "http://gitlab.gitlabonlinecom.click/"
+#   runnerRegistrationToken: "<TOKEN_FROM_SECRET>"  # không hardcode token
+
+#   resources:
+#     limits:
+#       memory: 500Mi
+#       cpu: "500m"
+#     requests:
+#       memory: 256Mi
+#       cpu: "250m"
+
+#   runners:
+#     executor: "kubernetes"
+#     tags: "eks,k8s,auto-scale"
+#     privileged: true
+#     namespace: "gitlab-runner"     # hoặc {{ .Release.Namespace }}
+#     pollTimeout: 600
+#     image: "python:3.11-slim"         # default image, job có thể override
+#     concurrent: 20
+
+#     # # Nếu muốn dùng cache S3:
+#     # cache:
+#     #   type: "s3"
+#     #   shared: true
+#     #   s3:
+#     #     bucketName: "gitlab-runner-cache-local"
+#     #     bucketLocation: "ap-southeast-1"
+#   hpa:
+#     enabled: true
+#     minReplicas: 1
+#     maxReplicas: 5
+#     metrics:
+#       - type: Resource
+#         resource:
+#           name: cpu
+#           target:
+#             type: Utilization
+#             averageUtilization: 80
+#     behavior:
+#       scaleDown:
+#         stabilizationWindowSeconds: 300
+#       scaleUp:
+#         stabilizationWindowSeconds: 60
+
+#   serviceAccount:
+#     create: true
+#     name: "gitlab-runner"
+#     annotations:
+#       eks.amazonaws.com/role-arn: "arn:aws:iam::609320954321:role/eks-gitlab-runner-role"
+
+
+
+
+
