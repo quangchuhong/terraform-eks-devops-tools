@@ -170,28 +170,24 @@ data "kubernetes_ingress_v1" "gitlab" {
 }
 
 
-# Bật/tắt bằng var.enable_dns_records (xem variables.tf)
-data "aws_lb" "selected" {
-  count = var.enable_dns_records ? 1 : 0
-
-  tags = {
-    Environment = "prod"
-    Application = "gitlab-alb"
-  }
-
-  depends_on = [helm_release.gitlab]
+# ALB của group alb-apps: lấy DNS name trực tiếp từ Ingress GitLab (status.loadBalancer),
+# không tìm theo tag → không nhầm với ALB khác trùng tag còn sót trong account.
+locals {
+  alb_dns_name = try(data.kubernetes_ingress_v1.gitlab.status[0].load_balancer[0].ingress[0].hostname, "")
 }
 
-# Zone ID (Canonical Hosted Zone ID) của ALB
+# Canonical hosted zone ID của ALB trong region hiện tại (dùng cho alias record)
+data "aws_lb_hosted_zone_id" "main" {}
+
 output "alb_zone_id" {
-  value = one(data.aws_lb.selected[*].zone_id)
+  value = data.aws_lb_hosted_zone_id.main.id
 }
 
-# DNS name của ALB
 output "alb_dns_name" {
-  value = one(data.aws_lb.selected[*].dns_name)
+  value = local.alb_dns_name
 }
 
+# Bật bằng var.enable_dns_records (xem variables.tf) khi Ingress đã có ADDRESS
 resource "aws_route53_record" "apps" {
   for_each = var.enable_dns_records ? toset(var.app_hostnames) : toset([])
 
@@ -200,8 +196,15 @@ resource "aws_route53_record" "apps" {
   type    = "A"
 
   alias {
-    name                   = "dualstack.${data.aws_lb.selected[0].dns_name}"
-    zone_id                = data.aws_lb.selected[0].zone_id
+    name                   = "dualstack.${local.alb_dns_name}"
+    zone_id                = data.aws_lb_hosted_zone_id.main.id
     evaluate_target_health = true
+  }
+
+  lifecycle {
+    precondition {
+      condition     = local.alb_dns_name != ""
+      error_message = "Ingress gitlab-webservice-default chưa có ADDRESS (ALB chưa tạo xong). Kiểm tra: kubectl get ingress -n gitlab"
+    }
   }
 }
