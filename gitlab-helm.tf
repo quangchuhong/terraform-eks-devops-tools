@@ -23,7 +23,6 @@ resource "helm_release" "gitlab" {
 
   timeout = 600 # 10 phút (mặc định: 300s)
 
-
   depends_on = [module.eks, module.eks.eks_managed_node_group,
     helm_release.lb_controller, helm_release.cluster_autoscaler,
     helm_release.metrics_server_release
@@ -45,7 +44,6 @@ data "tls_certificate" "eks_oidc" {
   url = data.aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
-
 data "aws_iam_policy_document" "gitlab_runner_irsa_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -64,7 +62,6 @@ data "aws_iam_policy_document" "gitlab_runner_irsa_trust" {
     }
   }
 }
-
 
 resource "aws_iam_role" "gitlab_runner" {
   name               = "eks-gitlab-runner-role"
@@ -152,8 +149,6 @@ resource "aws_iam_role_policy_attachment" "gitlab_runner_deploy_attach" {
   policy_arn = aws_iam_policy.gitlab_runner_deploy.arn
 }
 
-
-
 # 2. Lấy thông tin Ingress từ Helm chart đã cài đặt
 data "kubernetes_ingress_v1" "gitlab" {
   metadata {
@@ -164,39 +159,11 @@ data "kubernetes_ingress_v1" "gitlab" {
   depends_on = [helm_release.gitlab]
 }
 
-
 locals {
   domain = "gitlabonlinecom.click"
 }
 
-variable "route53_zone_id" {
-  type        = string
-  description = "Route53 Hosted Zone ID của gitlabonlinecom.click (account 545983214264)"
-  default     = "Z09980543QQOFQHVARDDQ"
-}
-
-# ALB do AWS Load Balancer Controller tạo bất đồng bộ SAU khi helm_release.gitlab xong,
-# nên lần apply đầu chưa tìm được ALB. Apply 2 lượt:
-#   1) terraform apply                                  (enable_dns_records = false)
-#   2) kubectl get ingress -n gitlab → có ADDRESS
-#      terraform apply -var enable_dns_records=true
-variable "enable_dns_records" {
-  type        = bool
-  description = "Tạo bản ghi Route 53 trỏ về ALB (bật ở lượt apply thứ 2, khi ALB đã tồn tại)"
-  default     = false
-}
-
-variable "app_hostnames" {
-  type        = list(string)
-  description = "Các subdomain trỏ về ALB dùng chung (group alb-apps)"
-  default = [
-    "gitlab", "registry", "minio", "kas",
-    "grafana", "prometheus", "alertmanager",
-    "nexus", "docker", "docker-proxy", "docker-internal",
-    "jenkins", "argocd", "sonarqube", "trivy", "jirasm",
-  ]
-}
-
+# Bật/tắt bằng var.enable_dns_records (xem variables.tf)
 data "aws_lb" "selected" {
   count = var.enable_dns_records ? 1 : 0
 

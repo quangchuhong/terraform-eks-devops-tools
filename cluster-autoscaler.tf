@@ -1,18 +1,5 @@
 # modules/eks_cluster_autoscaler/main.tf
 
-variable "region" {
-  type        = string
-  description = "AWS region"
-  default = "ap-southeast-1"
-}
-
-variable "helm_chart_version" {
-  type        = string
-  default     = "9.28.0"
-  description = "Cluster Autoscaler Helm chart version"
-}
-
-
 data "aws_iam_policy_document" "autoscaler" {
   statement {
     effect = "Allow"
@@ -62,49 +49,49 @@ resource "helm_release" "cluster_autoscaler" {
   version    = var.helm_chart_version
   namespace  = "kube-system"
 
-    set {
-        name  = "autoDiscovery.clusterName"
-        value = var.cluster_name
-    }
-    set {
-        name  = "fullnameOverride"
-        value = "cluster-autoscaler"  # 👈 Tên Kubernetes resources
-    }
+  set {
+    name  = "autoDiscovery.clusterName"
+    value = var.cluster_name
+  }
+  set {
+    name  = "fullnameOverride"
+    value = "cluster-autoscaler" # 👈 Tên Kubernetes resources
+  }
 
-    set {
-        name  = "awsRegion"
-        value = var.region
-    }
+  set {
+    name  = "awsRegion"
+    value = var.region
+  }
 
-    set {
-        name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-        value = module.irsa.iam_role_arn
-    }
+  set {
+    name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = module.irsa.iam_role_arn
+  }
 
-    set {
-        name  = "rbac.serviceAccount.name"
-        value = "cluster-autoscaler"
-    }
+  set {
+    name  = "rbac.serviceAccount.name"
+    value = "cluster-autoscaler"
+  }
 
-    set {
-        name  = "extraArgs.balance-similar-node-groups"
-        value = "true"
-    }
+  set {
+    name  = "extraArgs.balance-similar-node-groups"
+    value = "true"
+  }
 
-    set {
-        name  = "extraArgs.skip-nodes-with-system-pods"
-        value = "false"
-    }
-    set {
-        name  = "extraArgs.scale-down-unneeded-time"
-        value = "5m"
-        }
+  set {
+    name  = "extraArgs.skip-nodes-with-system-pods"
+    value = "false"
+  }
+  set {
+    name  = "extraArgs.scale-down-unneeded-time"
+    value = "5m"
+  }
 
-    set {
-        name  = "extraArgs.scale-down-delay-after-add"
-        value = "5m"
-        }
+  set {
+    name  = "extraArgs.scale-down-delay-after-add"
+    value = "5m"
+  }
 
-    depends_on = [ module.eks ]
+  depends_on = [module.eks]
 
 }
