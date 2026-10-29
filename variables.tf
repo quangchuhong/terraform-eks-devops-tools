@@ -21,7 +21,7 @@ variable "vpc_id" {
 variable "subnet_ids" {
   description = "Subnet public cho node EKS, control plane ENI và ALB"
   type        = list(string)
-  default     = ["subnet-0729b4d3570c85035", "subnet-01e7b81b2c34fbaae", "subnet-063d005e791e4932f"]
+  default     = ["subnet-01e7b81b2c34fbaae", "subnet-0729b4d3570c85035", "subnet-063d005e791e4932f"]
 }
 
 # ---------- Region ----------
