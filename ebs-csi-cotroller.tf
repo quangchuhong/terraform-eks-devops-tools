@@ -9,7 +9,12 @@ module "ebs_csi_iam" {
 
   role_name = "ebs-csi-controller-role"
 
-  attach_ebs_csi_policy = true
+  # Dùng policy do AWS quản lý (luôn cập nhật theo driver mới, có ec2:DescribeAvailabilityZones).
+  # Policy tự sinh của module IAM v5 (attach_ebs_csi_policy) thiếu quyền này → controller CrashLoop.
+  attach_ebs_csi_policy = false
+  role_policy_arns = {
+    ebs_csi = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  }
 
   oidc_providers = {
     main = {
@@ -31,8 +36,8 @@ resource "kubernetes_storage_class" "gp3" {
   storage_provisioner = "ebs.csi.aws.com"
   volume_binding_mode = "WaitForFirstConsumer"
   parameters = {
-    type = "gp3"
-    encrypted = "true"  # Enable encryption by default
+    type      = "gp3"
+    encrypted = "true" # Enable encryption by default
   }
 
   depends_on = [module.ebs_csi_iam]
