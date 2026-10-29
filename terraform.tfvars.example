@@ -8,7 +8,7 @@
 # cluster_admin_arns = ["arn:aws:iam::609320954321:role/<ten-role>"]
 
 # Version chart GitLab (helm search repo gitlab/gitlab --versions)
-# gitlab_chart_version = "9.11.5"
+# gitlab_chart_version = "9.11.16"
 
 # domain                    = "gitlabonlinecom.click"
 # manage_domain_nameservers = true

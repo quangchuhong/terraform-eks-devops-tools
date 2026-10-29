@@ -65,7 +65,7 @@ variable "helm_chart_version" {
 variable "gitlab_chart_version" {
   type        = string
   description = "Version Helm chart gitlab/gitlab"
-  default     = "9.11.5" # GitLab v18.11.4
+  default     = "9.11.16" # GitLab v18.11.14 (critical patch)
 }
 
 # ---------- DNS / Route 53 ----------
