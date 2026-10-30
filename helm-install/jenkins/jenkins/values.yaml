@@ -417,9 +417,11 @@ controller:
     - git:5.9.0
     # Required: JCasC creates the admin user and the kubernetes cloud
     - configuration-as-code:2031.veb_a_fdda_b_3ffd
-    # - gitlab-plugin:1.9.13
-    # - pipeline-stage-view:2.39
-    # - sonar:2.18.2
+    # Used by the ci-cd-maven-java-ver1 Jenkinsfile (withSonarQubeEnv/waitForQualityGate, junit, GitLab webhook)
+    - sonar:latest
+    - junit:latest
+    - gitlab-plugin:latest
+    - pipeline-stage-view:latest
     # - sonar-quality-gates:364.v67a_f255f340f
     # - blueocean-pipeline-scm-api:1.27.25
     # - blueocean-pipeline-editor:1.27.25
