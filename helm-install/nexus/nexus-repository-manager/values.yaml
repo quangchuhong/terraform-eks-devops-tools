@@ -10,9 +10,9 @@ deploymentStrategy: Recreate
 image:
   # Sonatype Official Public Image
   repository: sonatype/nexus3
-  # 3.71+ has no OrientDB (EOL, open critical CVEs); fresh installs use the embedded H2 database.
-  # Same version as the vendored nxrm-ha 85.0.0 chart.
-  tag: 3.85.0
+  # Kept on 3.68.1; nexus.datastore.enabled (below) puts new installs on H2 instead of OrientDB
+  # (OrientDB is end of life with open critical CVEs). 3.85.0 = H2-only alternative.
+  tag: 3.68.1
   pullPolicy: IfNotPresent
 imagePullSecrets:
 
@@ -28,6 +28,7 @@ nexus:
         -XX:MaxDirectMemorySize=1536m
         -Djava.util.prefs.userRoot=/nexus-data/javaprefs
         -Dnexus.scripts.allowCreation=true
+        -Dnexus.datastore.enabled=true
     - name: NEXUS_SECURITY_RANDOMPASSWORD
       value: "true"
   # Not mounted: a subPath mount makes kubelet create /nexus-data/etc as root, and
