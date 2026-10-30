@@ -416,7 +416,7 @@ controller:
     - workflow-aggregator:608.v67378e9d3db_1
     - git:5.9.0
     # Required: JCasC creates the admin user and the kubernetes cloud
-    - configuration-as-code:2031.veb_a_fdda_b_3ffd
+    - configuration-as-code:2036.v0b_c2de701dcb_
     # Used by the ci-cd-maven-java-ver1 Jenkinsfile (withSonarQubeEnv/waitForQualityGate, junit, GitLab webhook)
     - sonar:latest
     - junit:latest
