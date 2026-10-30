@@ -14,7 +14,7 @@ replicaCount: 1
 
 persistence:
   enabled: true
-  storageClass: ""
+  storageClass: gp3
   accessMode: ReadWriteOnce
   size: 5Gi
 
@@ -60,11 +60,6 @@ trivy:
   # debugMode the flag to enable Trivy debug mode
   debugMode: false
   # gitHubToken the GitHub access token to download Trivy DB
-  server:
-    enabled: true
-    # Port HTTP mà Trivy server lắng nghe bên trong Pod
-    port: 9090
-
   #
   # Trivy DB contains vulnerability information from NVD, Red Hat, and many other upstream vulnerability databases.
   # It is downloaded by Trivy from the GitHub release page https://github.com/aquasecurity/trivy-db/releases and cached
@@ -147,30 +142,23 @@ service:
   sessionAffinity: ClientIP
 
 ingress:
+  # Jenkins agents call the server in-cluster: trivy image --server http://trivy.trivy:9090 ...
+  # Enable only together with trivy.serverToken / existingSecret: the server has no auth otherwise.
   enabled: false
   ingressClassName: alb
-  annotations: 
+  # Shares the GitLab ALB (group alb-apps), HTTP only
+  annotations:
     alb.ingress.kubernetes.io/group.name: alb-apps
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
-    alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
-    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/subnets: subnet-01e7b81b2c34fbaae, subnet-0729b4d3570c85035, subnet-063d005e791e4932f
   hosts:
     - host: trivy.gitlabonlinecom.click
-      http:
-        paths:
-        - pathType: Prefix
-          path: "/"
-          backend:
-            service:
-              name: trivy
-              port:
-                number: 9090
-  #path: "/"
+  path: /
   # type is only needed for networking.k8s.io/v1 in k8s 1.19+
-  #pathType: Prefix
+  pathType: Prefix
   tls: []
   #  - secretName: trivy-example-tls
   #    hosts:

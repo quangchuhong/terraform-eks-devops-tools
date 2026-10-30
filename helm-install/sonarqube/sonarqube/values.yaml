@@ -172,17 +172,19 @@ ingress:
   ingressClassName: alb
   # Used to create an Ingress record.
   hosts:
-    - name: sonarqube.gitlabonlinecom.click 
+    - name: sonarqube.gitlabonlinecom.click
       # Different clouds or configurations might need /* as the default path
       path: /*
       pathType: ImplementationSpecific
-  annotations: 
+  # Shares the GitLab ALB (group alb-apps), HTTP only
+  annotations:
     alb.ingress.kubernetes.io/group.name: alb-apps
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /api/system/status
     alb.ingress.kubernetes.io/success-codes: "200-399"
-    alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
+    alb.ingress.kubernetes.io/subnets: subnet-01e7b81b2c34fbaae, subnet-0729b4d3570c85035, subnet-063d005e791e4932f
 
   tls: []
   # Secrets must be manually created in the namespace. To generate a self-signed certificate (and private key) and then create the secret in the cluster please refer to official documentation available at https://kubernetes.github.io/ingress-nginx/user-guide/tls/#tls-secrets
@@ -436,8 +438,9 @@ jvmCeOpts: ""
 # not setting the monitoring passcode will result in a deployment that will never be ready
 # monitoringPasscode: "define_it"
 # Alternatively, you can define the passcode loading it from an existing secret specifying the right key
-# monitoringPasscodeSecretName: "pass-secret-name"
-# monitoringPasscodeSecretKey: "pass-key"
+# Secret created by Terraform in namespace sonarqube
+monitoringPasscodeSecretName: "sonarqube-monitoring"
+monitoringPasscodeSecretKey: "passcode"
 
 ## Environment variables to attach to the pods
 ##
@@ -528,18 +531,14 @@ jdbcOverwrite:
   # (DEPRECATED) Please use jdbcOverwrite.enabled instead
   # enable: false
   # If enable the JDBC Overwrite, make sure to set `postgresql.enabled=false`
-  enabled: false
-  # The JDBC url of the external DB
-  jdbcUrl: "jdbc:postgresql://myPostgress/myDatabase"
-  # The DB user that should be used for the JDBC connection
-  jdbcUsername: "sonarUser"
-  # Use this if you don't mind the DB password getting stored in plain text within the values file
-  # (DEPRECATED) Please use `jdbcOverwrite.jdbcSecretName` along with `jdbcOverwrite.jdbcSecretPasswordKey` instead
-  jdbcPassword: "sonarPass"
-  ## Alternatively, use a pre-existing k8s secret containing the DB password
-  # jdbcSecretName: "sonarqube-jdbc"
-  ## and the secretValueKey of the password found within that secret
-  # jdbcSecretPasswordKey: "jdbc-password"
+  # Shared GitLab RDS PostgreSQL 17, database/role "sonarqube" (sonarqube-backend.tf).
+  enabled: true
+  # Set at install time: --set jdbcOverwrite.jdbcUrl="$(terraform output -raw sonarqube_jdbc_url)"
+  jdbcUrl: ""
+  jdbcUsername: "sonarqube"
+  # Secret created by Terraform in namespace sonarqube
+  jdbcSecretName: "sonarqube-jdbc"
+  jdbcSecretPasswordKey: "jdbc-password"
   # To install the oracle JDBC driver, set the following URL (in this example, we set the URL for the Oracle 11 driver. Please update it to your target driver URL.).
   # If downloading the driver requires authentication, please set the .netrc secret file with a key "netrc" to use basic auth.
   # oracleJdbcDriver:
@@ -550,7 +549,8 @@ jdbcOverwrite:
 ## ref: https://github.com/bitnami/charts/blob/master/bitnami/postgresql/README.md
 postgresql:
   # Enable to deploy the bitnami PostgreSQL chart
-  enabled: true
+  # Disabled: it ships PostgreSQL 11, SonarQube 2025.x needs 13+ (uses the shared RDS instead)
+  enabled: false
   ## postgresql Chart global settings
   # global:
   #   imageRegistry: ''

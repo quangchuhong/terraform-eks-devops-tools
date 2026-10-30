@@ -161,8 +161,7 @@ controller:
 
   # Set min/max heap here if needed with "-Xms512m -Xmx512m"
   # -- Append to `JAVA_OPTS` env var
-  # javaOpts: "-Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=true"
-  javaOpts: []
+  javaOpts: "-Xms512m -Xmx1024m"
 
   # -- Append to `JENKINS_OPTS` env var
   jenkinsOpts:
@@ -175,7 +174,7 @@ controller:
   jenkinsUrlProtocol:
 
   # -- Set Jenkins URL if you are not using the ingress definitions provided by the chart
-  jenkinsUrl: 
+  jenkinsUrl: "http://jenkins.gitlabonlinecom.click"
 
   # If you set this prefix and use ingress controller, then you might want to set the ingress path below
   # I.e., "/jenkins"
@@ -270,7 +269,7 @@ controller:
   probes:
     startupProbe:
       # -- Set the failure threshold for the startup probe
-      failureThreshold: 12
+      failureThreshold: 30
       httpGet:
         # -- Set the Pod's HTTP path for the startup probe
         path: '{{ default "" .Values.controller.jenkinsUriPrefix }}/login'
@@ -356,9 +355,9 @@ controller:
   csrf:
     defaultCrumbIssuer:
       # -- Enable the default CSRF Crumb issuer
-      enabled: false
+      enabled: true
       # -- Enable proxy compatibility. This setting is ignored if you are not on the current LTS release and will be dropped with the next LTS.
-      proxyCompatability: false
+      proxyCompatability: true
 
   # Kubernetes service type for the JNLP agent service
   # agentListenerServiceType is the Kubernetes Service type for the JNLP agent service,
@@ -415,9 +414,10 @@ controller:
   installPlugins:
     - kubernetes:4423.vb_59f230b_ce53
     - workflow-aggregator:608.v67378e9d3db_1
-    # - git:5.9.0
+    - git:5.9.0
+    # Required: JCasC creates the admin user and the kubernetes cloud
+    - configuration-as-code:2031.veb_a_fdda_b_3ffd
     # - gitlab-plugin:1.9.13
-    # - configuration-as-code:2031.veb_a_fdda_b_3ffd
     # - pipeline-stage-view:2.39
     # - sonar:2.18.2
     # - sonar-quality-gates:364.v67a_f255f340f
@@ -535,31 +535,8 @@ controller:
         jenkins:
           systemMessage: "Jenkins configured automatically by Jenkins Configuration as Code plugin"
 
-      kubernetes-cloud: |
-        jenkins:
-          clouds:
-            - kubernetes:
-                name: "kubernetes"
-                serverUrl: "https://kubernetes.default.svc"
-                skipTlsVerify: true
-                namespace: "jenkins"
-                jenkinsUrl: "http://jenkins.jenkins.svc.cluster.local:8080"
-                jenkinsTunnel: "jenkins-agent.jenkins.svc.cluster.local:50000"
-                containerCapStr: "10"
-                maxRequestsPerHostStr: "32"
-                retentionTimeout: "5"
-                connectTimeout: "10"
-                readTimeout: "20"
-                templates:
-                  - name: "default"
-                    label: "jenkins-agent"
-                    namespace: "jenkins"
-                    serviceAccount: "jenkins"
-                    containers:
-                      - name: "jnlp"
-                        image: "jenkins/inbound-agent:latest-jdk17"
-                        args: "${computer.jnlpmac} ${computer.name}"
-                        ttyEnabled: true
+    # The kubernetes cloud + agent pod template come from defaultConfig (agent.* values);
+    # a second jenkins.clouds script would conflict with it.
     # -- Enables default Jenkins configuration via configuration as code plugin
     defaultConfig: true
 
@@ -749,23 +726,19 @@ controller:
 
   ingress:
     enabled: true
-    name: jenkins-ingress
     ingressClassName: alb
+    # Shares the GitLab ALB (group alb-apps), HTTP only
     annotations:
       alb.ingress.kubernetes.io/group.name: alb-apps
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80,"HTTPS":443}]'
-      alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:609320954321:certificate/569f4470-6ac3-4ef2-be6e-7eb012397305"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
       alb.ingress.kubernetes.io/success-codes: "200-399"
-      alb.ingress.kubernetes.io/ssl-redirect: "443"
-      alb.ingress.kubernetes.io/subnets: subnet-0729b4d3570c85035, subnet-01e7b81b2c34fbaae, subnet-063d005e791e4932f
+      # "/" returns 403 before login
+      alb.ingress.kubernetes.io/healthcheck-path: /login
+      alb.ingress.kubernetes.io/subnets: subnet-01e7b81b2c34fbaae, subnet-0729b4d3570c85035, subnet-063d005e791e4932f
     hostName: "jenkins.gitlabonlinecom.click"
-
-    tls:
-      - hosts:
-          - jenkins.gitlabonlinecom.click
-        secretName: dummy-jenkins-tls
+    tls: []
 
     # -- Ingress API version
     apiVersion: "extensions/v1beta1"
@@ -1218,7 +1191,7 @@ agent:
   # Keys are only used to give the pod template a meaningful name. The only restriction is they may only contain RFC 1123 \ DNS label
   # characters: lowercase letters, numbers, and hyphens. Each pod template can contain multiple containers.
   # For this pod templates configuration to be loaded, the following values must be set:
-  controller.JCasC.defaultConfig: true
+  # controller.JCasC.defaultConfig: true
   # Best reference is https://<jenkins_url>/configuration-as-code/reference#Cloud-kubernetes. The example below creates a python pod template.
   # -- Configures extra pod templates for the default kubernetes cloud
   podTemplates: {}
@@ -1308,7 +1281,7 @@ persistence:
   # If undefined (the default) or set to null, no storageClassName spec is
   #   set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS & OpenStack)
   # -- Storage class for the PVC
-  storageClass:
+  storageClass: gp3
   # -- Annotations for the PVC
   annotations: {}
   # -- Labels for the PVC
@@ -1316,7 +1289,7 @@ persistence:
   # -- The PVC access mode
   accessMode: "ReadWriteOnce"
   # -- The size of the PVC
-  size: "8Gi"
+  size: "20Gi"
 
   # ref: https://kubernetes.io/docs/concepts/storage/volume-pvc-datasource/
   # -- Existing data source to clone PVC from
