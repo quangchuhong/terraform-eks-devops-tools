@@ -25,10 +25,13 @@ nexus:
         -Xms2048m -Xmx2048m
         -XX:MaxDirectMemorySize=1536m
         -Djava.util.prefs.userRoot=/nexus-data/javaprefs
+        -Dnexus.scripts.allowCreation=true
     - name: NEXUS_SECURITY_RANDOMPASSWORD
       value: "true"
+  # Not mounted: a subPath mount makes kubelet create /nexus-data/etc as root, and
+  # Nexus (uid 200) then cannot create /nexus-data/etc/logback. Set via JVM option above.
   properties:
-    override: true
+    override: false
     data:
       nexus.scripts.allowCreation: true
   resources:
@@ -68,7 +71,17 @@ fullnameOverride: "nexus"
 
 deployment:
   annotations: {}
+  # Give /nexus-data back to the nexus user (uid/gid 200), also for dirs left root-owned
   initContainers:
+    - name: fix-permissions
+      image: busybox:1.36
+      command: ["sh", "-c", "chown -R 200:200 /nexus-data"]
+      securityContext:
+        runAsUser: 0
+        runAsNonRoot: false
+      volumeMounts:
+        - name: nexus-repository-manager-data
+          mountPath: /nexus-data
   postStart:
     command:
   preStart:
