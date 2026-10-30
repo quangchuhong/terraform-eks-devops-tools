@@ -31,10 +31,10 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   # Người chạy Terraform đã là admin nhờ enable_cluster_creator_admin_permissions.
-  # Thêm admin khác (IAM user/role dùng cho Console...) qua var.cluster_admin_arns.
-  # Lưu ý: không thêm chính người tạo cụm (trùng access entry) và không dùng ":root".
+  # Thêm admin khác (root, IAM user/role dùng cho Console...) qua var.cluster_admin_arns.
+  # Lưu ý: không thêm chính người tạo cụm (trùng access entry).
   access_entries = {
-    for arn in var.cluster_admin_arns : replace(element(split("/", arn), length(split("/", arn)) - 1), ".", "-") => {
+    for arn in var.cluster_admin_arns : (endswith(arn, ":root") ? "root" : replace(element(split("/", arn), length(split("/", arn)) - 1), ".", "-")) => {
       principal_arn = arn
       policy_associations = {
         admin = {

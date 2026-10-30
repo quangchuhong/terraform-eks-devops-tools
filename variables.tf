@@ -24,18 +24,13 @@ variable "subnet_ids" {
   default     = ["subnet-01e7b81b2c34fbaae", "subnet-0729b4d3570c85035", "subnet-063d005e791e4932f"]
 }
 
-# IAM user/role được quyền admin cụm EKS (ví dụ danh tính đăng nhập Console).
+# Danh tính được quyền admin cụm EKS (ví dụ danh tính đăng nhập Console):
+# root ("arn:aws:iam::<account>:root"), IAM user hoặc IAM role.
 # Người chạy Terraform đã là admin sẵn → KHÔNG thêm lại ARN đó (trùng access entry).
-# Không dùng root ("arn:aws:iam::<account>:root").
 variable "cluster_admin_arns" {
-  description = "ARN IAM user/role được cấp AmazonEKSClusterAdminPolicy trên cụm"
+  description = "ARN (root, IAM user/role) được cấp AmazonEKSClusterAdminPolicy trên cụm"
   type        = list(string)
   default     = []
-
-  validation {
-    condition     = alltrue([for a in var.cluster_admin_arns : !endswith(a, ":root")])
-    error_message = "Access entry không nhận root user; dùng ARN của IAM user hoặc role."
-  }
 }
 
 # ---------- Region ----------
