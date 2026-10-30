@@ -56,7 +56,10 @@ module "eks" {
       ami_type       = "AL2023_x86_64_STANDARD" # "AL2023_x86_64_STANDARD" # "BOTTLEROCKET_x86_64"
       instance_types = ["t3.xlarge"]
 
-      min_size     = 2
+      # One node per AZ at minimum: the EBS volumes (Jenkins, Nexus, Trivy, SonarQube, Gitaly) are
+      # zonal, and with 2 nodes one AZ can be left empty - the Cluster Autoscaler cannot pick the
+      # AZ in a multi-AZ group ("volume node affinity conflict"), so those pods stay Pending.
+      min_size     = 3
       max_size     = 10
       desired_size = 3
 
