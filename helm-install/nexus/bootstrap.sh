@@ -105,7 +105,7 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -u "$AUTH" -X PUT -H 'Content-Type
 [[ "$code" =~ ^2 ]] || { echo "FAIL  change-password -> HTTP $code"; exit 1; }
 echo "OK    password of ${CI_USER} set"
 
-kubectl create namespace jenkins --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl get namespace jenkins >/dev/null 2>&1 || kubectl create namespace jenkins >/dev/null
 kubectl -n jenkins create secret generic nexus-ci \
   --from-literal=username="$CI_USER" --from-literal=password="$CI_PASS" \
   --dry-run=client -o yaml | kubectl apply -f -
