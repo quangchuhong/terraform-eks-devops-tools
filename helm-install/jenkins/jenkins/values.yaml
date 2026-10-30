@@ -612,7 +612,20 @@ controller:
   existingSecret:
 
   # -- List of additional existing secrets to mount
-  additionalExistingSecrets: []
+  # Created outside git (helm-install/nexus/bootstrap.sh, helm-install/sonarqube/bootstrap.sh,
+  # kubectl for gitlab-ci); used in JCasC as ${<name>-<keyName>}. They must exist before the
+  # pod starts, otherwise it stays in ContainerCreating.
+  additionalExistingSecrets:
+    - name: nexus-ci
+      keyName: username
+    - name: nexus-ci
+      keyName: password
+    - name: sonarqube-token
+      keyName: token
+    - name: gitlab-ci
+      keyName: username
+    - name: gitlab-ci
+      keyName: token
   # ref: https://github.com/jenkinsci/configuration-as-code-plugin/blob/master/docs/features/secrets.adoc#kubernetes-secrets
   # additionalExistingSecrets:
   #  - name: secret-name-1
@@ -657,6 +670,44 @@ controller:
       welcome-message: |
         jenkins:
           systemMessage: "Jenkins configured automatically by Jenkins Configuration as Code plugin"
+
+      # Credentials and SonarQube server used by the CI/CD pipelines (ids match the Jenkinsfiles).
+      # Secret values come from the mounted Kubernetes secrets, never from git.
+      ci-integrations: |
+        credentials:
+          system:
+            domainCredentials:
+              - credentials:
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: nexus-creds
+                      description: "Nexus ci-jenkins: maven-public read, maven deploy"
+                      username: "${nexus-ci-username}"
+                      password: "${nexus-ci-password}"
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: docker-user-internal
+                      description: "Nexus ci-jenkins: push to docker-hosted (docker-internal)"
+                      username: "${nexus-ci-username}"
+                      password: "${nexus-ci-password}"
+                  - string:
+                      scope: GLOBAL
+                      id: sonarqube-token
+                      description: "SonarQube global analysis token"
+                      secret: "${sonarqube-token-token}"
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: gitlab-token-dev-group
+                      description: "GitLab access token: clone app repos, push the GitOps repo"
+                      username: "${gitlab-ci-username}"
+                      password: "${gitlab-ci-token}"
+        unclassified:
+          sonarGlobalConfiguration:
+            buildWrapperEnabled: true
+            installations:
+              - name: "SonarQube"
+                serverUrl: "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
+                credentialsId: "sonarqube-token"
 
     # The kubernetes cloud + agent pod template come from defaultConfig (agent.* values);
     # a second jenkins.clouds script would conflict with it.
