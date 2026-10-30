@@ -170,7 +170,7 @@ PCI DSS áp dụng khi pipeline build và deploy phần mềm thuộc hoặc k�
 | **8.4.2** – MFA | MFA cho mọi truy cập vào CDE | SSO có MFA | ❌ |
 | **8.6.1–8.6.3** – Tài khoản hệ thống | Quản lý tài khoản ứng dụng, không viết cứng mật khẩu | Secret trong Kubernetes, credential binding (không in ra log), xoay token định kỳ | ✅ / ⚠️ cần lịch xoay token |
 | **10.2** – Audit log | Ghi lại hành động của người dùng và admin | Plugin `audit-trail`, log Kubernetes API (EKS control plane logging) | ❌ |
-| **10.5.1** – Lưu log | 12 tháng, 3 tháng gần nhất truy xuất ngay | CloudWatch Logs hoặc S3 có retention | ❌ |
+| **10.5.1** – Lưu log | 12 tháng, 3 tháng gần nhất truy xuất ngay | Log build: S3 Object Lock 365 ngày ([5.14](05-huong-dan-trien-khai.md#514-lưu-trữ-log-build-lên-s3)). Audit log thao tác người dùng: còn thiếu | ⚠️ |
 | **10.6** – Đồng bộ thời gian | Thời gian chuẩn | Node EKS dùng Amazon Time Sync | ✅ |
 | **11.3** – Quét lỗ hổng định kỳ | Quét nội bộ hằng quý | Lịch quét image (Trivy) và hạ tầng | ⚠️ Mới quét khi build |
 | **11.5.2** – Phát hiện thay đổi | Cảnh báo khi file quan trọng bị sửa | Toàn bộ cấu hình Jenkins là code (Helm + JCasC); `overwritePlugins` gỡ plugin cài tay | ✅ một phần |

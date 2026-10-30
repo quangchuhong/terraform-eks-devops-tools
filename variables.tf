@@ -213,3 +213,26 @@ variable "jenkins_artifacts_retention_days" {
   type        = number
   default     = 400
 }
+
+variable "jenkins_build_logs_retention_days" {
+  description = "Days before archived Jenkins build logs are deleted from S3 (must be > jenkins_build_logs_lock_days)"
+  type        = number
+  default     = 400
+}
+
+variable "jenkins_build_logs_lock_days" {
+  description = "S3 Object Lock retention for archived build logs (365 = 12 months, PCI DSS 10.5.1)"
+  type        = number
+  default     = 365
+}
+
+variable "jenkins_build_logs_lock_mode" {
+  description = "S3 Object Lock mode: GOVERNANCE (users with bypass permission can delete) or COMPLIANCE (nobody can, not even root)"
+  type        = string
+  default     = "GOVERNANCE"
+
+  validation {
+    condition     = contains(["GOVERNANCE", "COMPLIANCE"], var.jenkins_build_logs_lock_mode)
+    error_message = "jenkins_build_logs_lock_mode must be GOVERNANCE or COMPLIANCE."
+  }
+}

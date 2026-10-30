@@ -1,0 +1,97 @@
+# Archive build logs (Console Output) and build metadata (build.xml) to S3.
+# Apply AFTER `terraform apply` has created the bucket (output jenkins_build_logs_bucket),
+# and ALWAYS pass this file together with values.yaml:
+#   helm upgrade jenkins . -n jenkins -f values.yaml -f values-build-logs.yaml
+#
+# A sidecar in the controller pod scans JENKINS_HOME (read-only) every LOG_INTERVAL seconds and
+# uploads each FINISHED build once: <build>/log then <build>/build.xml, to
+#   s3://<bucket>/jenkins/<job path>/builds/<n>/{log,build.xml}
+# Credentials come from IRSA (service account jenkins); the role can write but not delete, and the
+# bucket has Object Lock. The sidecar never exits on errors, so it cannot take the controller down.
+controller:
+  sidecars:
+    additionalSidecarContainers:
+      - name: build-log-archiver
+        image: amazon/aws-cli:2.38.1
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            set -u
+            export LC_ALL=C
+            STATE=/state/archived.txt
+            log() { echo "$(date -u +%FT%TZ) $*"; }
+            seed() {
+              aws s3api list-objects-v2 --bucket "$LOG_BUCKET" --prefix "$LOG_PREFIX" \
+                --query 'Contents[].Key' --output text > /state/keys.txt || return 1
+              tr '\t' '\n' < /state/keys.txt | grep '/build.xml$' \
+                | sed -e "s|^$LOG_PREFIX||" -e 's|/build.xml$||' | sort -u > "$STATE.tmp" \
+                && mv "$STATE.tmp" "$STATE"
+              log "seeded $(wc -l < "$STATE") archived builds from s3://$LOG_BUCKET/$LOG_PREFIX"
+            }
+            log "build-log-archiver started, bucket=$LOG_BUCKET prefix=$LOG_PREFIX"
+            while true; do
+              if [ ! -f "$STATE" ] && ! seed; then
+                log "cannot list s3://$LOG_BUCKET (bucket missing or no permission), retry later"
+                sleep "$LOG_INTERVAL"; continue
+              fi
+              cd /var/jenkins_home || { sleep "$LOG_INTERVAL"; continue; }
+              find jobs -path '*/builds/*' -name build.xml -printf '%h\n' 2>/dev/null | sort -u > /state/all.txt
+              comm -23 /state/all.txt "$STATE" | while IFS= read -r d; do
+                grep -q '<completed>false</completed>' "$d/build.xml" && continue
+                grep -q '<result>' "$d/build.xml" || continue
+                if [ -f "$d/log" ]; then
+                  aws s3 cp "$d/log" "s3://$LOG_BUCKET/$LOG_PREFIX$d/log" --only-show-errors \
+                    --content-type 'text/plain; charset=utf-8' || { log "upload failed: $d/log"; continue; }
+                fi
+                aws s3 cp "$d/build.xml" "s3://$LOG_BUCKET/$LOG_PREFIX$d/build.xml" --only-show-errors \
+                  || { log "upload failed: $d/build.xml"; continue; }
+                echo "$d" >> "$STATE"
+                log "archived $d"
+              done
+              sort -u -o "$STATE" "$STATE"
+              sleep "$LOG_INTERVAL"
+            done
+        env:
+          - name: LOG_BUCKET
+            value: "jenkins-609320954321-build-logs"
+          - name: LOG_PREFIX
+            value: "jenkins/"
+          - name: LOG_INTERVAL
+            value: "120"
+          - name: AWS_REGION
+            value: "ap-southeast-1"
+          - name: HOME
+            value: /state
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+          - name: jenkins-home
+            mountPath: /var/jenkins_home
+            readOnly: true
+          - name: build-log-state
+            mountPath: /state
+          - name: build-log-tmp
+            mountPath: /tmp
+
+persistence:
+  volumes:
+    - name: build-log-state
+      emptyDir:
+        sizeLimit: 100Mi
+    - name: build-log-tmp
+      emptyDir:
+        sizeLimit: 100Mi

@@ -296,4 +296,87 @@ Nếu PVC dừng ở điều kiện `FileSystemResizePending` quá lâu, filesys
    kubectl -n jenkins exec jenkins-0 -c jenkins -- sh -c 'du -sh /var/jenkins_home/jobs/*/branches/* 2>/dev/null | sort -h | tail -10'
    ```
    Các thủ phạm hay gặp: nhánh Multibranch đã xoá nhưng job còn (đặt orphaned item strategy), log build rất dài (test in quá nhiều log), thư mục `workspace/` trên controller (không nên có, vì không build trên controller), và `caches/`.
-4. **Đưa log build ra ngoài** (S3 hoặc CloudWatch, giai đoạn sau): phần này chiếm nhiều dung lượng nhất sau khi artifact đã lên S3.
+4. **Đưa log build ra ngoài:** lưu trữ lên S3 ([5.14](#514-lưu-trữ-log-build-lên-s3)) rồi giảm số build giữ lại trên Jenkins; phần này chiếm nhiều dung lượng nhất sau khi artifact đã lên S3.
+
+## 5.14. Lưu trữ log build lên S3
+
+Sau khi artifact đã lên S3 ([5.12](#512-artifact-trên-s3-và-node-group-riêng-cho-ci-agent)), phần lớn dung lượng `JENKINS_HOME` còn lại là log build (Console Output) và metadata build. Mục này đưa chúng lên S3 để:
+
+- `JENKINS_HOME` chỉ giữ các build gần đây cho giao diện (build discarder), nên volume nhỏ và ổn định;
+- S3 giữ bản lưu trữ **bất biến 12 tháng** cho kiểm toán (PCI DSS 10.5.1, 10.3.3), không phụ thuộc vào việc build bị xoá trên Jenkins.
+
+### Vì sao không dùng plugin
+
+Jenkins không có plugin đưa log build lên S3 nào đang được duy trì tốt (phần "external logging" của JEP-210 chỉ có bản thử nghiệm cho CloudWatch/Elasticsearch, ít cập nhật). Với môi trường ngân hàng, cách an toàn là **giữ nguyên cơ chế log của Jenkins và sao chép bản đã hoàn tất ra ngoài**. Nếu bước sao chép lỗi thì Jenkins vẫn chạy bình thường.
+
+### Kiến trúc
+
+```
+Pod jenkins-0
+├── jenkins (controller)              ghi log vào /var/jenkins_home/jobs/<job>/builds/<n>/log
+└── build-log-archiver (sidecar)      mount JENKINS_HOME read-only
+      cứ 120 giây: tìm build đã xong và chưa lưu
+      → aws s3 cp log, rồi build.xml   (IRSA: role jenkins, chỉ ghi, không xoá)
+                                        ▼
+s3://jenkins-609320954321-build-logs/jenkins/jobs/<job>/.../builds/<n>/{log,build.xml}
+      SSE-KMS · Object Lock 365 ngày · IA 30 ngày → Glacier IR 90 ngày → xoá sau 400 ngày
+```
+
+| Thành phần | File |
+|---|---|
+| Bucket (Object Lock, versioning, SSE-KMS dùng chung key artifact, chặn public, chỉ cho TLS, lifecycle) và quyền ghi cho role IRSA `eks-cluster-ver1-jenkins-artifacts` | `jenkins-build-logs.tf`, biến `jenkins_build_logs_*` trong `variables.tf` |
+| Sidecar `build-log-archiver` (`amazon/aws-cli`, non-root, root filesystem read-only, `JENKINS_HOME` read-only) | `helm-install/jenkins/jenkins/values-build-logs.yaml` |
+
+Cách sidecar xác định build đã xong: `build.xml` có `<result>` và không có `<completed>false</completed>` (đúng cho cả Pipeline và Freestyle). Mỗi build được tải lên **một lần**: `log` trước, `build.xml` sau. Sự có mặt của `build.xml` trên S3 nghĩa là build đó đã lưu đủ. Danh sách build đã lưu nằm trong `emptyDir`; khi pod khởi động lại, sidecar đọc lại danh sách từ S3 nên không tải trùng.
+
+Sidecar không bao giờ tự thoát khi lỗi (bucket chưa có, thiếu quyền, mạng), chỉ ghi log và thử lại. Nhờ vậy nó không làm pod `jenkins-0` mất trạng thái Ready.
+
+### Thứ tự áp dụng
+
+1. Tạo bucket và quyền:
+   ```bash
+   terraform plan -out tf.plan
+   terraform apply tf.plan
+   terraform output jenkins_build_logs_bucket
+   ```
+   Plan cần có: `aws_s3_bucket.jenkins_build_logs` (+ các cấu hình đi kèm) và `aws_iam_role_policy.jenkins_build_logs`. **Object Lock chỉ bật được khi tạo bucket**, nên bucket này phải được tạo bằng Terraform từ đầu.
+2. Cài sidecar. **Luôn truyền cả hai file values** (thiếu `-f values-build-logs.yaml` ở lần upgrade sau thì sidecar bị gỡ):
+   ```bash
+   cd helm-install/jenkins/jenkins
+   helm upgrade jenkins . -n jenkins -f values.yaml -f values-build-logs.yaml
+   ```
+   Pod `jenkins-0` sẽ khởi động lại (khoảng 5 phút) vì spec pod thay đổi.
+
+### Kiểm tra
+
+```bash
+kubectl -n jenkins get pod jenkins-0 -o jsonpath='{.spec.containers[*].name}{"\n"}'
+kubectl -n jenkins logs jenkins-0 -c build-log-archiver --tail=20
+aws s3 ls s3://jenkins-609320954321-build-logs/jenkins/jobs/ --recursive | tail
+```
+
+Log sidecar mong đợi: `seeded N archived builds`, sau mỗi build xong có dòng `archived jobs/shopping-cart/branches/main/builds/<n>`.
+
+### Đọc lại log đã lưu
+
+```bash
+aws s3 cp s3://jenkins-609320954321-build-logs/jenkins/jobs/shopping-cart/branches/main/builds/12/log - | less
+aws s3 cp s3://jenkins-609320954321-build-logs/jenkins/jobs/shopping-cart/branches/main/builds/12/build.xml - | grep -E '<result>|<duration>|<userId>'
+```
+
+Log Pipeline có các dòng đánh dấu dạng `ha:////…` (thông tin hiển thị cho giao diện); có thể lọc bằng `perl -pe 's/\e\[8m.*?\e\[0m//g'`. Để tìm kiếm trên nhiều build, dùng **Amazon Athena** trên bucket hoặc tải về theo prefix.
+
+### Sau khi chạy ổn định: giảm lượng giữ lại trên Jenkins
+
+Khi đã thấy build mới được lưu đều lên S3, có thể giảm số build giữ trên `JENKINS_HOME`, ví dụ `numToKeepStr: '20'` → `'10'` cộng `daysToKeepStr: '30'`, và bật global build discarder cho các job không tự khai báo. Đây mới là bước làm volume nhỏ lại: S3 giữ bản lưu trữ, Jenkins chỉ giữ bản làm việc.
+
+### Lưu ý
+
+| Vấn đề | Giải thích |
+|---|---|
+| Object Lock `GOVERNANCE` (mặc định) | Người có quyền `s3:BypassGovernanceRetention` vẫn xoá được, phù hợp môi trường lab. Production ngân hàng: đặt `jenkins_build_logs_lock_mode = "COMPLIANCE"` (không ai xoá được trước hạn, kể cả root; hãy chắc chắn về số ngày trước khi bật) |
+| Log có thể chứa dữ liệu nhạy cảm | Jenkins che credential trong log (`withCredentials`), nhưng lệnh `echo` tự viết thì không. Kiểm tra Jenkinsfile không in secret/PAN; bucket mã hoá KMS và chỉ role kiểm toán được đọc |
+| Build chờ `input` lâu | Chưa có `<result>` nên chưa được lưu; sẽ lưu khi build kết thúc |
+| Build bị xoá trên Jenkins trước khi sidecar quét (ví dụ discarder chạy ngay) | Sidecar quét mỗi 120 giây, discarder chỉ xoá build cũ, nên thực tế không xảy ra; nếu `numToKeep` rất nhỏ (1–2) thì giảm `LOG_INTERVAL` |
+| `JENKINS_HOME` rất lớn (hàng chục nghìn build) | `find` mỗi 2 phút vẫn nhẹ; nếu cần, tăng `LOG_INTERVAL` |
+| Muốn tìm kiếm, dashboard log theo thời gian thực | Bổ sung Fluent Bit tail `jobs/*/builds/*/log` gửi CloudWatch Logs/OpenSearch. S3 vẫn là bản lưu trữ chính |
