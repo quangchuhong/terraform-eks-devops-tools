@@ -413,41 +413,145 @@ controller:
   # Plugins will be installed during Jenkins controller start
   # -- List of Jenkins plugins to install. If you don't want to install plugins, set it to `false`
   installPlugins:
-    # "latest" everywhere: jenkins-plugin-cli resolves one consistent set for this Jenkins core.
-    # Pinning a single plugin (e.g. configuration-as-code) older than what a dependency needs
-    # makes the init container fail. Freeze versions with helm-install/jenkins/security-audit if needed.
+    # Every plugin is pinned (top-level + dependencies), versions taken from a running
+    # Jenkins 2.580.2 with no security warnings. To upgrade: set the top-level ones to
+    # "latest", deploy, check with security-audit/run.sh, then re-pin from
+    # security-audit/run.sh plugins.groovy.
     # Core
-    - kubernetes:latest
-    - workflow-aggregator:latest
-    - configuration-as-code:latest
-    - matrix-auth:latest
+    - kubernetes:4560.vc25b_83890c34
+    - workflow-aggregator:608.v67378e9d3db_1
+    - configuration-as-code:2143.vc78d4eb_d4174
+    - matrix-auth:3.3
     # SCM
-    - git:latest
-    - gitlab-branch-source:latest
+    - git:5.11.0
+    - gitlab-branch-source:749.v63a_c68676751
     # Pipeline helpers
-    - pipeline-utility-steps:latest
-    - config-file-provider:latest
-    - timestamper:latest
-    - ansicolor:latest
-    - ws-cleanup:latest
-    - pipeline-graph-view:latest
-    - pipeline-stage-view:latest
+    - pipeline-utility-steps:3.810.va_7672d206740
+    - config-file-provider:1013.v73c323e52b_1f
+    - timestamper:1.30
+    - ansicolor:542.v03d235fee02d
+    - ws-cleanup:0.49
+    - pipeline-graph-view:1053.v9df19e6ceed2
+    - pipeline-stage-view:2.41
     # Quality / security reports (JUnit, JaCoCo/Cobertura/lcov, pylint/eslint/gcc/cppcheck/Trivy)
-    - sonar:latest
-    - junit:latest
-    - coverage:latest
-    - warnings-ng:latest
-    - htmlpublisher:latest
+    - sonar:2.19.0
+    - junit:1455.v5c1b_eed56292
+    - coverage:3.3499.v910e11c96847
+    - warnings-ng:13.10345.v6642ea_283a_ef
+    - htmlpublisher:429
     # Kubernetes / AWS
-    - kubernetes-cli:latest
-    - aws-credentials:latest
-    - pipeline-aws:latest
+    - kubernetes-cli:1.375.v8001982544ba
+    - aws-credentials:265.v8422a_f384cd9
+    - pipeline-aws:767.v48d5c10b_1899
     # Notifications
-    - email-ext:latest
+    - email-ext:2038.v7b_8817a_499d9
+    # Dependencies
+    - analysis-model-api:14.18.0-1028.v9c938eeda_ef2
+    - antisamy-markup-formatter:173.v680e3a_b_69ff3
+    - apache-httpcomponents-client-4-api:4.5.14-269.vfa_2321039a_83
+    - apache-httpcomponents-client-5-api:5.6.4-207.vd5b_a_c15e4de5
+    - asm-api:9.11.1-226.vff833a_e4c58e
+    - authentication-tokens:1.144.v5ff4a_5ec5c33
+    - aws-java-sdk-ec2:1.12.780-480.v4a_0819121a_9e
+    - aws-java-sdk-minimal:1.12.780-480.v4a_0819121a_9e
+    - aws-java-sdk2-apigateway:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-cloudformation:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-cloudfront:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-codedeploy:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-core:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-ec2:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-ecr:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-elasticbeanstalk:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-elasticloadbalancingv2:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-iam:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-lambda:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-netty-nio-client:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-organizations:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-s3:2.56.0-80.v7a_7cdf2f4dc8
+    - aws-java-sdk2-sns:2.56.0-80.v7a_7cdf2f4dc8
+    - bootstrap5-api:5.3.8-1048.va_c299057e35c
+    - bouncycastle-api:2.30.1.86.2-310.v4655f6742752
+    - branch-api:2.1303.v9f3b_95dc329d
+    - caffeine-api:3.3.1-214.v18eb_56b_34920
+    - checks-api:434.va_a_3dd79d7723
+    - cloudbees-folder:6.1107.v31f8955765c8
+    - commons-compress-api:1.28.0-97.v0d8a_548e7f24
+    - commons-lang3-api:3.21.0-122.v6a_ea_4fd34049
+    - commons-text-api:1.15.0-218.va_61573470393
+    - credentials:1514.vb_01eb_014e7d4
+    - credentials-binding:728.v902a_273b_8947
+    - data-tables-api:2.3.8-1570.v1cb_1cd2a_0fb_c
+    - display-url-api:2.217.va_6b_de84cc74b_
+    - durable-task:686.v80ff80875b_82
+    - echarts-api:6.1.0-1321.v86c4c5114494
+    - font-awesome-api:7.3.1-1013.v0835a_879ec6d
+    - forensics-api:4.1923.v445c56df9b_2e
+    - git-client:6.6.1
+    - gitlab-api:6.3.0-126.vd066b_d896159
+    - gson-api:2.15.0-212.v085f60a_8093b_
+    - handy-uri-templates-2-api:2.1.8-38.vcea_5d521d5f3
+    - instance-identity:203.v15e81a_1b_7a_38
+    - ionicons-api:94.vcc3065403257
+    - jackson-annotations2-api:2.22-19.v10a_a_582ea_26e
+    - jackson2-api:2.22.4-449.v4ee9f4ec4123
+    - jackson3-api:3.2.4-103.vf5a_b_3f4ea_cec
+    - jakarta-activation-api:2.1.4-1
+    - jakarta-mail-api:2.1.5-1
+    - jakarta-xml-bind-api:4.0.9-19.v2b_a_5b_44d9a_1c
+    - javax-activation-api:1.2.0-8
+    - jaxb:2.3.9-143.v5979df3304e6
+    - jersey3-api:3.1.11-4.v77818819c2e1
+    - joda-time-api:2.15.1-211.ve499f52b_da_33
+    - jquery3-api:3.7.1-687.v68d468e40b_30
+    - json-api:20260814-226.v20f9685d642c
+    - json-path-api:3.0.0-218.vcd4dd1355de2
+    - jsoup:1.23.2-106.v1161f282b_eb_f
+    - kubernetes-client-api:7.3.1-256.v788a_0b_787114
+    - kubernetes-credentials:207.v492f58828b_ed
+    - mailer:534.v1b_36f5864073
+    - matrix-project:928.v1effc3f3a_236
+    - metrics:4.2.37-494.v06f9a_939d33a_
+    - mina-sshd-api-common:2.19.0-192.v2b_a_7b_2c1dc71
+    - mina-sshd-api-core:2.19.0-192.v2b_a_7b_2c1dc71
+    - netty-api:4.2.18.Final-34.v861b_21a_78c0f
+    - okhttp-api:5.5.0-242.v1482d48d3ea_3
+    - pipeline-build-step:601.v6d4c6d1a_9dc7
+    - pipeline-graph-analysis:254.v0f63a_a_447dca_
+    - pipeline-groovy-lib:822.vc95f70dea_db_7
+    - pipeline-input-step:560.v56198a_642157
+    - pipeline-milestone-step:152.v6e22b_8cfc66c
+    - pipeline-model-api:2.2293.v6e7193cec599
+    - pipeline-model-definition:2.2293.v6e7193cec599
+    - pipeline-model-extensions:2.2293.v6e7193cec599
+    - pipeline-rest-api:2.41
+    - pipeline-stage-step:345.va_96187909426
+    - pipeline-stage-tags-metadata:2.2293.v6e7193cec599
+    - plain-credentials:199.v9f8e1f741799
+    - plugin-util-api:7.1403.vd380b_c42e90c
+    - prism-api:1.30.0-741.v034eb_0b_0a_a_fa_
+    - resource-disposer:0.25
+    - scm-api:728.vc30dcf7a_0df5
+    - script-security:1436.v1082791135e4
+    - snakeyaml-api:2.7-152.vc672728cf536
+    - snakeyaml-engine-api:3.2-18.v885ed7ff698f
+    - ssh-credentials:372.va_250881b_08cd
+    - structs:362.va_b_695ef4fdf9
+    - token-macro:477.vd4f0dc3cb_cf1
+    - variant:70.va_d9f17f859e0
+    - woodstox-core-api:7.3.0-16.v017f30ed004c
+    - workflow-api:1429.v7a_1b_efb_a_f7c5
+    - workflow-basic-steps:1129.v60e3c7e6654d
+    - workflow-cps:4395.v738456a_5da_6b_
+    - workflow-durable-task-step:1479.v56e587f413a_7
+    - workflow-job:1622.vc41c189cb_e5f
+    - workflow-multibranch:842.v3a_b_59b_57b_e6e
+    - workflow-scm-step:487.v41313a_96b_65d
+    - workflow-step-api:724.v538c2362b_dfb_
+    - workflow-support:1028.vc22910142650
 
   # If set to false, Jenkins will download the minimum required version of all dependencies.
   # -- Download the minimum required version or latest version of all dependencies
-  installLatestPlugins: true
+  installLatestPlugins: false
 
   # -- Set to true to download the latest version of any plugin that is requested to have the latest version
   installLatestSpecifiedPlugins: false
