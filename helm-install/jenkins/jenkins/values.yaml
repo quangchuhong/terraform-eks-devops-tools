@@ -412,22 +412,37 @@ controller:
   # Plugins will be installed during Jenkins controller start
   # -- List of Jenkins plugins to install. If you don't want to install plugins, set it to `false`
   installPlugins:
-    - kubernetes:4423.vb_59f230b_ce53
-    - workflow-aggregator:608.v67378e9d3db_1
-    - git:5.9.0
-    # Required: JCasC creates the admin user and the kubernetes cloud
-    - configuration-as-code:2036.v0b_c2de701dcb_
-    # Used by the ci-cd-maven-java-ver1 Jenkinsfile (withSonarQubeEnv/waitForQualityGate, junit, GitLab webhook)
+    # "latest" everywhere: jenkins-plugin-cli resolves one consistent set for this Jenkins core.
+    # Pinning a single plugin (e.g. configuration-as-code) older than what a dependency needs
+    # makes the init container fail. Freeze versions with helm-install/jenkins/security-audit if needed.
+    # Core
+    - kubernetes:latest
+    - workflow-aggregator:latest
+    - configuration-as-code:latest
+    - matrix-auth:latest
+    # SCM
+    - git:latest
+    - gitlab-branch-source:latest
+    # Pipeline helpers
+    - pipeline-utility-steps:latest
+    - config-file-provider:latest
+    - timestamper:latest
+    - ansicolor:latest
+    - ws-cleanup:latest
+    - pipeline-graph-view:latest
+    - pipeline-stage-view:latest
+    # Quality / security reports (JUnit, JaCoCo/Cobertura/lcov, pylint/eslint/gcc/cppcheck/Trivy)
     - sonar:latest
     - junit:latest
-    - gitlab-plugin:latest
-    - pipeline-stage-view:latest
-    # - sonar-quality-gates:364.v67a_f255f340f
-    # - blueocean-pipeline-scm-api:1.27.25
-    # - blueocean-pipeline-editor:1.27.25
-    # - aws-credentials:254.v978a_5e206a_d7
-    # - aws-java-sdk:1.12.780-480.v4a_0819121a_9e
-    # - pipeline-aws:1.45
+    - coverage:latest
+    - warnings-ng:latest
+    - htmlpublisher:latest
+    # Kubernetes / AWS
+    - kubernetes-cli:latest
+    - aws-credentials:latest
+    - pipeline-aws:latest
+    # Notifications
+    - email-ext:latest
 
   # If set to false, Jenkins will download the minimum required version of all dependencies.
   # -- Download the minimum required version or latest version of all dependencies
@@ -450,7 +465,8 @@ controller:
 
   # Enable to always override the installed plugins with the values of 'controller.installPlugins' on upgrade or redeployment.
   # -- Overwrite installed plugins on start
-  overwritePlugins: false
+  # The list above is the source of truth: plugins removed from it are uninstalled on restart
+  overwritePlugins: true
 
   # Configures if plugins bundled with `controller.image` should be overwritten with the values of 'controller.installPlugins' on upgrade or redeployment.
   # -- Overwrite plugins that are already installed in the controller image

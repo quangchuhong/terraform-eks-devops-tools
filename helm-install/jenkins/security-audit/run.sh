@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Runs audit.groovy in the Jenkins script console from inside the controller pod.
+# Runs a Groovy script (default audit.groovy) in the Jenkins script console from inside the controller pod.
+#   ./run.sh                 security report
+#   ./run.sh plugins.groovy  installed plugins as name:version (to pin installPlugins)
 # The admin password is read from the pod's own secret mount and never printed.
 set -euo pipefail
 cd "$(dirname "$0")"
 NS="${NS:-jenkins}"
 POD="${POD:-jenkins-0}"
+SCRIPT="${1:-audit.groovy}"
 
-kubectl -n "$NS" exec -i "$POD" -c jenkins -- sh -c 'cat > /tmp/audit.groovy' < audit.groovy
+kubectl -n "$NS" exec -i "$POD" -c jenkins -- sh -c 'cat > /tmp/audit.groovy' < "$SCRIPT"
 kubectl -n "$NS" exec "$POD" -c jenkins -- sh -c '
   U=$(cat /run/secrets/additional/chart-admin-username)
   P=$(cat /run/secrets/additional/chart-admin-password)
