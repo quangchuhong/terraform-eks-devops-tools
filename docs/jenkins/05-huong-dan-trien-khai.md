@@ -138,7 +138,152 @@ aws ec2 create-snapshot --volume-id "$VOL" --description "jenkins-home $(date +%
 
 Nên tự động hoá việc này bằng **AWS Backup** hoặc **Data Lifecycle Manager** (snapshot hằng ngày, giữ 7–30 bản).
 
-**Khôi phục:** tạo volume từ snapshot **trong cùng AZ** với node, tạo PV/PVC trỏ tới volume đó, rồi cài Jenkins với `persistence.existingClaim`. Cấu hình hệ thống, plugin và credentials đã nằm trong values, JCasC và Secret, nên snapshot chủ yếu để giữ job, lịch sử build và artifact.
+### Khôi phục (rollback) từ snapshot
+
+Snapshot dùng được để rollback `JENKINS_HOME` về thời điểm chụp: **mọi job, build và lịch sử phát sinh sau thời điểm đó sẽ mất**. Cấu hình hệ thống, plugin và credentials vẫn lấy từ `values.yaml`, JCasC và Secret, nên snapshot chủ yếu để giữ job, lịch sử build và metadata.
+
+Không "đổ" snapshot ngược vào volume đang chạy được. Cách làm:
+
+1. tạo **volume EBS mới** từ snapshot;
+2. gắn volume mới vào Jenkins bằng một PVC **cùng tên `jenkins`** và có metadata của Helm, nên không phải sửa `values.yaml`, và `helm upgrade` về sau vẫn chạy bình thường;
+3. **giữ volume cũ** (reclaim `Retain`) để quay lại nếu cần.
+
+Jenkins gián đoạn khoảng 5–10 phút. Nên làm khi không có build đang chạy.
+
+**Bước 0. Kiểm tra snapshot, lấy AZ, lưu PVC hiện tại.** Đặt `SNAP` là ID snapshot cần khôi phục:
+
+```bash
+SNAP=snap-0c3bbd8afa38531a5
+aws ec2 describe-snapshots --snapshot-ids $SNAP --region ap-southeast-1 --query 'Snapshots[0].[State,VolumeSize,Encrypted]' --output text
+OLD_PV=$(kubectl -n jenkins get pvc jenkins -o jsonpath='{.spec.volumeName}')
+kubectl get pv $OLD_PV -o jsonpath='{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0]}{"\n"}'
+kubectl -n jenkins get pvc jenkins -o yaml > /tmp/pvc-jenkins-old.yaml
+```
+
+Snapshot phải ở trạng thái `completed`. Lệnh thứ 4 in ra `key` và `values` (AZ) của volume cũ; gán vào biến, ví dụ:
+
+```bash
+AZ_KEY=topology.kubernetes.io/zone
+AZ=ap-southeast-1a
+```
+
+AZ phải có node đang chạy (EBS chỉ gắn được vào node cùng AZ). Snapshot thì khôi phục được sang AZ bất kỳ trong region, nên đây cũng là cách chuyển Jenkins sang AZ khác khi AZ cũ gặp sự cố.
+
+**Bước 1. Tạo volume mới từ snapshot** (size bằng `persistence.size` hiện tại):
+
+```bash
+NEW_VOL=$(aws ec2 create-volume --snapshot-id $SNAP --availability-zone $AZ --volume-type gp3 --size 50 --encrypted --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=jenkins-home-restore},{Key=app,Value=jenkins}]' --region ap-southeast-1 --query VolumeId --output text)
+echo $NEW_VOL
+aws ec2 wait volume-available --volume-ids $NEW_VOL --region ap-southeast-1
+```
+
+**Bước 2. Giữ volume cũ.** StorageClass `gp3` dùng `reclaimPolicy: Delete`: nếu bỏ qua bước này, xoá PVC ở bước 4 sẽ **xoá luôn volume cũ**.
+
+```bash
+kubectl patch pv $OLD_PV -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+kubectl get pv $OLD_PV -o jsonpath='{.spec.persistentVolumeReclaimPolicy}{"\n"}'
+```
+
+Phải thấy `Retain` rồi mới làm tiếp.
+
+**Bước 3. Dừng Jenkins:**
+
+```bash
+kubectl -n jenkins scale statefulset jenkins --replicas=0
+kubectl -n jenkins wait --for=delete pod/jenkins-0 --timeout=300s
+```
+
+**Bước 4. Xoá PVC cũ** (volume cũ vẫn còn nhờ bước 2):
+
+```bash
+kubectl -n jenkins delete pvc jenkins
+```
+
+**Bước 5. Tạo PV trỏ tới volume mới và PVC `jenkins` gắn với PV đó:**
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jenkins-home-restore
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: gp3
+  claimRef:
+    namespace: jenkins
+    name: jenkins
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: ${NEW_VOL}
+    fsType: ext4
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: ${AZ_KEY}
+              operator: In
+              values: ["${AZ}"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jenkins
+  namespace: jenkins
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    meta.helm.sh/release-name: jenkins
+    meta.helm.sh/release-namespace: jenkins
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: gp3
+  volumeName: jenkins-home-restore
+  resources:
+    requests:
+      storage: 50Gi
+EOF
+kubectl -n jenkins get pvc jenkins
+```
+
+PVC phải `Bound` với `jenkins-home-restore`. Label và annotation Helm giúp `helm upgrade` sau này nhận PVC này là của release `jenkins`.
+
+**Bước 6. Khởi động lại và kiểm tra:**
+
+```bash
+kubectl -n jenkins scale statefulset jenkins --replicas=1
+kubectl -n jenkins get pod jenkins-0 -w
+kubectl -n jenkins exec jenkins-0 -c jenkins -- df -h /var/jenkins_home
+```
+
+Trên giao diện: job và lịch sử build giống thời điểm chụp snapshot. `df` nên báo khoảng 50G. Nếu chỉ báo bằng kích thước snapshot (filesystem chưa được mở rộng), mở rộng PVC thêm một chút để kubelet resize filesystem, rồi sửa `persistence.size` trong `values.yaml` cho khớp:
+
+```bash
+kubectl -n jenkins patch pvc jenkins -p '{"spec":{"resources":{"requests":{"storage":"51Gi"}}}}'
+```
+
+**Bước 7. Dọn dẹp** (chỉ khi chắc chắn bản khôi phục ổn, ví dụ sau vài ngày):
+
+```bash
+OLD_VOL=$(kubectl get pv $OLD_PV -o jsonpath='{.spec.csi.volumeHandle}')
+kubectl delete pv $OLD_PV
+aws ec2 delete-volume --volume-id $OLD_VOL --region ap-southeast-1
+```
+
+**Quay lại volume cũ** nếu bản khôi phục có vấn đề: làm lại bước 3–6, nhưng ở bước 5 bỏ phần PV (PV cũ vẫn còn), PVC dùng `volumeName: <OLD_PV>`, và trước đó xoá `claimRef` cũ trên PV:
+
+```bash
+kubectl patch pv $OLD_PV --type json -p '[{"op":"remove","path":"/spec/claimRef"}]'
+```
+
+**Lưu ý:**
+
+- Tập rollback định kỳ (ví dụ mỗi quý) trên môi trường thử và ghi lại thời gian khôi phục thực tế (RTO). Với ngân hàng, kiểm tra khôi phục là yêu cầu kiểm toán (xem [6.4.5](06-van-hanh-va-tu-dong-hoa.md#645-sao-lưu-và-kiểm-tra-khôi-phục)).
+- Snapshot thủ công dùng trước các thay đổi lớn (nâng cấp, resize). Hằng ngày dùng AWS Backup hoặc DLM.
+- Thay `50Gi` / `--size 50` bằng `persistence.size` hiện tại nếu đã thay đổi.
 
 ## 5.10. Sự cố đã gặp
 
