@@ -445,6 +445,8 @@ controller:
     - pipeline-aws:767.v48d5c10b_1899
     # Notifications
     - email-ext:2038.v7b_8817a_499d9
+    # Artifacts and stashes on S3 (jenkins-storage.tf). Not pinned yet: pin from plugins.groovy after the first start
+    - artifact-manager-s3:latest
     # Dependencies
     - analysis-model-api:14.18.0-1028.v9c938eeda_ef2
     - antisamy-markup-formatter:173.v680e3a_b_69ff3
@@ -708,6 +710,21 @@ controller:
               - name: "SonarQube"
                 serverUrl: "http://sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
                 credentialsId: "sonarqube-token"
+
+      # archiveArtifacts / stash go to S3 (artifact-manager-s3), signed URLs from the controller's
+      # IRSA role, agents upload and download directly. Bucket from: terraform output jenkins_artifacts_bucket
+      artifact-s3: |
+        unclassified:
+          artifactManager:
+            artifactManagerFactories:
+              - jclouds:
+                  provider: "s3"
+        aws:
+          awsCredentials:
+            region: "ap-southeast-1"
+          s3:
+            container: "jenkins-609320954321-artifacts"
+            prefix: "jenkins/"
 
     # The kubernetes cloud + agent pod template come from defaultConfig (agent.* values);
     # a second jenkins.clouds script would conflict with it.
@@ -1280,7 +1297,9 @@ agent:
   #   secretName: my-k8s-secret
 
   # -- Node labels for pod assignment
-  nodeSelector: {}
+  # Build pods run on the tainted CI node group (eks.tf: ci_agents)
+  nodeSelector:
+    workload: ci-agents
   # Key Value selectors. Ex:
   # nodeSelector
   #   jenkins-agent: v1
@@ -1320,7 +1339,16 @@ agent:
   # https://github.com/jenkinsci/kubernetes-plugin#using-yaml-to-define-pod-templates
   # https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   # -- The raw yaml of a Pod API Object to merge into the agent spec
-  yamlTemplate: ""
+  # Tolerate the taint of the CI node group (eks.tf: ci_agents)
+  yamlTemplate: |-
+    apiVersion: v1
+    kind: Pod
+    spec:
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: ci-agents
+          effect: NoSchedule
   # yamlTemplate: |-
   #   apiVersion: v1
   #   kind: Pod
@@ -1528,7 +1556,9 @@ serviceAccount:
   #  -- The name of the ServiceAccount to be used by access-controlled resources
   name: jenkins
   # -- Configures annotations for the ServiceAccount
-  annotations: {}
+  # IRSA (jenkins-storage.tf): S3 artifact bucket + its KMS key, nothing else
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::609320954321:role/eks-cluster-ver1-jenkins-artifacts
   # -- Configures extra labels for the ServiceAccount
   extraLabels: {}
   # -- Controller ServiceAccount image pull secret

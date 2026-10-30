@@ -160,3 +160,61 @@ helm -n jenkins uninstall jenkins
 ```
 
 PVC `jenkins` vẫn còn sau lệnh trên. Chỉ xoá PVC (`kubectl -n jenkins delete pvc jenkins`) sau khi đã snapshot, vì xoá PVC sẽ xoá luôn volume EBS.
+
+## 5.12. Artifact trên S3 và node group riêng cho CI agent
+
+### Thành phần
+
+| Thành phần | Cấu hình | File |
+|---|---|---|
+| Bucket `jenkins-609320954321-artifacts` | SSE-KMS (key riêng, xoay vòng hằng năm), chặn public, versioning, chỉ cho truy cập qua TLS; lifecycle: Standard-IA sau 30 ngày, Glacier Instant Retrieval sau 90 ngày, xoá sau `jenkins_artifacts_retention_days` (mặc định 400 ngày, > 12 tháng) | `jenkins-storage.tf` |
+| IAM role `eks-cluster-ver1-jenkins-artifacts` (IRSA) | Chỉ service account `jenkins/jenkins` được assume; chỉ có quyền trên bucket và KMS key đó | `jenkins-storage.tf` |
+| Plugin `artifact-manager-s3` + JCasC `artifact-s3` | `archiveArtifacts`/`stash` lưu trên S3. Controller ký URL, agent tải lên/xuống trực tiếp, không đi qua controller | `helm-install/jenkins/jenkins/values.yaml` |
+| Node group `ci_agents` | `m6i.xlarge`/`m5.xlarge`, ON_DEMAND (đổi `ci_agent_capacity_type = "SPOT"` để giảm chi phí), 1–10 node, ổ gốc 100 GiB, label và taint `workload=ci-agents:NoSchedule` | `eks.tf`, `variables.tf` |
+| Pod agent của Jenkins | `nodeSelector: workload=ci-agents` + toleration (template mặc định trong values và `podTemplate` trong Jenkinsfile) | `values.yaml`, `Jenkinsfile` của app |
+
+### Thứ tự áp dụng
+
+1. **Terraform trước**: tạo node group, bucket và IAM role.
+   ```bash
+   git pull origin main
+   terraform plan
+   terraform apply
+   kubectl get nodes -L workload
+   ```
+   Plan mong đợi: **thêm** node group `ci_agents`, KMS key/alias, bucket và các cấu hình đi kèm, IAM role/policy; **không** đổi node group `eks_nodes`. Phải có ít nhất 1 node mang `workload=ci-agents`.
+2. **Jenkins**: chạy `helm upgrade` (thêm plugin, IRSA, JCasC S3, agent mặc định lên node CI).
+   ```bash
+   helm upgrade --install jenkins ./helm-install/jenkins/jenkins -n jenkins --timeout 15m
+   kubectl -n jenkins wait --for=condition=Ready pod/jenkins-0 --timeout=15m
+   ```
+   Nếu init container báo `PluginDependencyException`, xử lý như mục 5.8. Khi chạy ổn, ghim `artifact-manager-s3` và các dependency mới bằng `security-audit/run.sh plugins.groovy`.
+3. **Jenkinsfile của app** (đã có `nodeSelector` + toleration): push lên GitLab rồi chạy build. Nếu đổi Jenkinsfile trước khi có node group, pod agent sẽ `Pending` mãi.
+
+### Kiểm tra
+
+```bash
+kubectl -n jenkins get pods -o wide
+kubectl -n jenkins exec jenkins-0 -c jenkins -- sh -c 'env | grep -E "AWS_ROLE_ARN|AWS_WEB_IDENTITY_TOKEN_FILE"'
+aws s3 ls s3://$(terraform output -raw jenkins_artifacts_bucket)/jenkins/ --recursive | head
+```
+
+- Pod agent `shopping-cart-*` phải chạy trên node có `workload=ci-agents`.
+- Controller có biến `AWS_ROLE_ARN` (IRSA đã gắn).
+- Sau một build có `archiveArtifacts` (báo cáo Trivy), file xuất hiện dưới `jenkins/` trong bucket. Trên giao diện Jenkins vẫn tải artifact bình thường (qua URL đã ký).
+
+### GitLab Runner dùng chung node group CI
+
+Khi cài GitLab Runner (Kubernetes executor), đặt pod job lên cùng node group:
+
+```toml
+[[runners]]
+  [runners.kubernetes]
+    namespace = "gitlab-runner"
+    [runners.kubernetes.node_selector]
+      workload = "ci-agents"
+    [runners.kubernetes.node_tolerations]
+      "workload=ci-agents" = "NoSchedule"
+```
+
+Pod của chính GitLab Runner (manager) có thể chạy ở node thường. Chỉ pod **job** cần lên node CI.

@@ -93,6 +93,43 @@ module "eks" {
       ]
 
     }
+
+    # Build pods only (Jenkins agents, GitLab Runner jobs): tainted so the DevOps tools
+    # (GitLab, Jenkins controller, Nexus, SonarQube) never land here and builds never
+    # take their CPU, memory or disk. No EBS volumes here, so one group across all AZs is fine.
+    ci_agents = {
+      ami_type       = "AL2023_x86_64_STANDARD"
+      instance_types = var.ci_agent_instance_types
+      capacity_type  = var.ci_agent_capacity_type
+
+      min_size     = var.ci_agent_min_size
+      max_size     = var.ci_agent_max_size
+      desired_size = var.ci_agent_min_size
+
+      labels = {
+        workload = "ci-agents"
+      }
+      taints = {
+        ci_agents = {
+          key    = "workload"
+          value  = "ci-agents"
+          effect = "NO_SCHEDULE"
+        }
+      }
+
+      # docker-in-docker layers, Trivy Java DB and Maven caches live on the root volume
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = var.node_disk_size
+            volume_type           = "gp3"
+            encrypted             = true
+            delete_on_termination = true
+          }
+        }
+      }
+    }
   }
 
   tags = {

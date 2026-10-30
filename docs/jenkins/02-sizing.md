@@ -219,7 +219,7 @@ Lưu ý khi scale dọc:
 | 5 | **Shared Library chuẩn hoá** | Tránh mỗi team tự viết Groovy kém hiệu quả | Hàm `mavenPipeline()`, `dockerBuild()`… do platform team tối ưu |
 | 6 | **Durability phù hợp từng loại pipeline** | `MAX_SURVIVABILITY` (mặc định) ghi trạng thái xuống đĩa rất thường xuyên | Pipeline CI (build, test): `PERFORMANCE_OPTIMIZED`. Pipeline deploy production: **giữ `MAX_SURVIVABILITY`** để tiếp tục được sau khi controller khởi động lại |
 | 7 | **Giảm log** | Log được ghi qua controller xuống `JENKINS_HOME` | `mvn -B -q` hoặc `--no-transfer-progress`, không in toàn bộ output test; đẩy log chi tiết ra file và lưu ở S3 |
-| 8 | **Artifact lưu ở S3, không lưu trên controller** | `archiveArtifacts` và `stash` file lớn đi qua controller | Plugin `artifact-manager-s3` (bucket SSE-KMS, chặn public, versioning); jar và image đẩy lên Nexus |
+| 8 | **Artifact lưu ở S3, không lưu trên controller** | `archiveArtifacts` và `stash` file lớn đi qua controller | Plugin `artifact-manager-s3` (bucket SSE-KMS, chặn public, versioning); jar và image đẩy lên Nexus **[Hiện có: `jenkins-storage.tf`]** |
 | 9 | **Giới hạn số build lưu lại** | `JENKINS_HOME` nhỏ thì khởi động nhanh, giao diện nhanh | Global build discarder (JCasC) + `buildDiscarder` trong mỗi `Jenkinsfile` **[Hiện có cho shopping-cart]** |
 | 10 | **Image controller có sẵn plugin** | Khởi động khoảng 1 phút thay vì 5 phút, không phụ thuộc Internet | [Phần 6.4.1](06-van-hanh-va-tu-dong-hoa.md#641-image-controller-có-sẵn-plugin) |
 | 11 | **Bộ plugin tối thiểu** | Mỗi plugin tốn heap và là một bề mặt tấn công | Rà soát hằng quý, gỡ plugin không dùng; ghim phiên bản **[Hiện có]** |
@@ -263,7 +263,7 @@ Tên các khoá JCasC của `artifact-manager-s3` có thể khác nhau giữa c�
 
 | Biện pháp | Cấu hình |
 |---|---|
-| Node group (hoặc Karpenter NodePool) **riêng cho agent**, có taint | Build không ảnh hưởng controller và các app khác (GitLab, Nexus) |
+| Node group (hoặc Karpenter NodePool) **riêng cho agent**, có taint | Build không ảnh hưởng controller và các app khác (GitLab, Nexus). **[Hiện có: node group `ci_agents`, label/taint `workload=ci-agents`]** |
 | **Karpenter** | Tạo node khoảng 1 phút, chọn đúng loại máy; Spot cho build CI, On-Demand cho pipeline deploy production |
 | **Requests/limits cho mọi container**, kể cả `ephemeral-storage` | Xếp pod chính xác, tránh Evicted (đã gặp với Trivy) |
 | **Cache dependency** | Nexus proxy (Maven, npm, PyPI, Docker); image build có sẵn công cụ |

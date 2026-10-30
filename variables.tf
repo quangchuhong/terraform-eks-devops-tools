@@ -181,3 +181,35 @@ variable "node_disk_size" {
   type        = number
   default     = 100
 }
+
+# ---------- CI agents (Jenkins agents, GitLab Runner jobs) ----------
+variable "ci_agent_instance_types" {
+  description = "Instance types of the CI agent node group (several types help Spot capacity)"
+  type        = list(string)
+  default     = ["m6i.xlarge", "m5.xlarge"]
+}
+
+variable "ci_agent_capacity_type" {
+  description = "ON_DEMAND or SPOT for the CI agent node group (SPOT: cheaper, builds can be interrupted)"
+  type        = string
+  default     = "ON_DEMAND"
+}
+
+variable "ci_agent_min_size" {
+  description = "Minimum CI agent nodes"
+  type        = number
+  default     = 1
+}
+
+variable "ci_agent_max_size" {
+  description = "Maximum CI agent nodes"
+  type        = number
+  default     = 10
+}
+
+# ---------- Jenkins artifacts on S3 ----------
+variable "jenkins_artifacts_retention_days" {
+  description = "Days before Jenkins artifacts/stashes are deleted from S3 (> 365 to keep 12 months, PCI DSS 10.5.1)"
+  type        = number
+  default     = 400
+}
