@@ -48,6 +48,8 @@ resource "kubernetes_secret_v1" "sonarqube_monitoring" {
 # The RDS instance is private, so the role and database are created from inside
 # the cluster by a one-off Job that logs in as the RDS master user. It runs in the
 # gitlab namespace, which already holds the master password secret.
+# Kubernetes turns "$$" in container args into "$", so the DO block uses the $body$ tag,
+# and \gset keeps the password out of the job log.
 resource "kubernetes_secret_v1" "sonarqube_db_bootstrap" {
   metadata {
     name      = "sonarqube-db-bootstrap"
@@ -79,8 +81,8 @@ resource "kubernetes_job_v1" "sonarqube_db_bootstrap" {
           args = [<<-EOT
             set -e
             psql -v ON_ERROR_STOP=1 -v pw="$SONAR_PASSWORD" <<'SQL'
-            SELECT set_config('bootstrap.pw', :'pw', false);
-            DO $$
+            SELECT set_config('bootstrap.pw', :'pw', false) AS ignored \gset
+            DO $body$
             BEGIN
               IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${local.sonarqube_db_user}') THEN
                 EXECUTE format('CREATE ROLE ${local.sonarqube_db_user} LOGIN PASSWORD %L', current_setting('bootstrap.pw'));
@@ -88,7 +90,7 @@ resource "kubernetes_job_v1" "sonarqube_db_bootstrap" {
                 EXECUTE format('ALTER ROLE ${local.sonarqube_db_user} LOGIN PASSWORD %L', current_setting('bootstrap.pw'));
               END IF;
             END
-            $$;
+            $body$;
             GRANT ${local.sonarqube_db_user} TO CURRENT_USER;
             SELECT 'CREATE DATABASE ${local.sonarqube_db_name} OWNER ${local.sonarqube_db_user}'
             WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${local.sonarqube_db_name}')\gexec
