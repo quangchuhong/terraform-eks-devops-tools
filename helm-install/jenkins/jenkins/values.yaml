@@ -1343,7 +1343,7 @@ rbac:
   # -- Whether RBAC resources are created
   create: true
   # -- Whether the Jenkins service account should be able to read Kubernetes secrets
-  readSecrets: true
+  readSecrets: false
   # -- Whether the Jenkins service account should be able to use the OpenShift "nonroot" Security Context Constraints
   useOpenShiftNonRootSCC: false
 
