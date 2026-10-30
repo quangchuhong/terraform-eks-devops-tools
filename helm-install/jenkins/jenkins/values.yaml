@@ -42,7 +42,8 @@ controller:
     repository: "jenkins/jenkins"
 
     # -- Controller image tag override; i.e., tag: "2.440.1-jdk21"
-    tag:
+    # Current LTS (security fixes for core-2_551..core-2_588); chart appVersion is 2.528.3
+    tag: "2.580.2-jdk21"
 
     # -- Controller image tag label
     tagLabel: jdk21
