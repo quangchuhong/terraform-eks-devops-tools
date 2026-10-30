@@ -17,7 +17,7 @@ Jenkins là công cụ CI của nền tảng DevOps trên EKS (`eks-cluster-ver1
 2. [Sizing theo mức tải](02-sizing.md): cấu hình cho tải thấp, tải vừa và enterprise; chỉ số cần theo dõi; vì sao controller dùng StatefulSet và cách scale khi nhiều job đồng thời (scale dọc + giảm tải cho controller, theo mô hình banking).
 3. [Tích hợp, bảo mật và tuân thủ PCI DSS](03-tich-hop-va-bao-mat.md): tích hợp với GitLab, Nexus, SonarQube, Trivy, Argo CD, AWS; hiện trạng và lộ trình hardening; đối chiếu PCI DSS v4.0.1.
 4. [So sánh với các công cụ CI/CD khác](04-so-sanh-cong-cu-ci-cd.md): GitLab CI, GitHub Actions, Tekton/Argo Workflows, AWS CodeBuild/CodePipeline, Azure DevOps.
-5. [Hướng dẫn cấu hình đã triển khai](05-huong-dan-trien-khai.md): các bước cài, Secret, đăng nhập, kiểm tra, nâng cấp, sao lưu, sự cố đã gặp.
+5. [Hướng dẫn cấu hình đã triển khai](05-huong-dan-trien-khai.md): các bước cài, Secret, đăng nhập, kiểm tra, nâng cấp, sao lưu, sự cố đã gặp, artifact trên S3, mở rộng volume `JENKINS_HOME`.
 6. [Vận hành và tự động hoá (enterprise)](06-van-hanh-va-tu-dong-hoa.md): mô hình vận hành, SLO, lịch định kỳ, quy trình nâng cấp an toàn, tự động hoá (image có sẵn plugin, Renovate, pipeline platform, cảnh báo bảo mật, Prometheus, sao lưu DLM, Shared Library, ApplicationSet), runbook sự cố, lộ trình áp dụng.
 
 ## Tóm tắt nhanh

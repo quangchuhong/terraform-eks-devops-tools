@@ -35,6 +35,11 @@ resource "kubernetes_storage_class" "gp3" {
 
   storage_provisioner = "ebs.csi.aws.com"
   volume_binding_mode = "WaitForFirstConsumer"
+
+  # Cho phép mở rộng PVC online (tăng spec.resources.requests.storage).
+  # Provider kubernetes mặc định đã là true; ghi rõ để không phụ thuộc mặc định.
+  allow_volume_expansion = true
+
   parameters = {
     type      = "gp3"
     encrypted = "true" # Enable encryption by default

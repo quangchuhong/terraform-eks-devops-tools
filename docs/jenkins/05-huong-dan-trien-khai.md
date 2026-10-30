@@ -218,3 +218,82 @@ Khi cài GitLab Runner (Kubernetes executor), đặt pod job lên cùng node gro
 ```
 
 Pod của chính GitLab Runner (manager) có thể chạy ở node thường. Chỉ pod **job** cần lên node CI.
+
+## 5.13. Mở rộng volume `JENKINS_HOME` khi gần đầy
+
+`JENKINS_HOME` (PVC `jenkins`, mặc định 20Gi) chứa log build (Console Output), kết quả test và coverage, metadata build, cấu hình job và plugin. Artifact và stash đã chuyển lên S3 ([5.12](#512-artifact-trên-s3-và-node-group-riêng-cho-ci-agent)). Volume vẫn đầy dần theo số job và số build được giữ lại.
+
+### Điều kiện (đã có sẵn)
+
+| Điều kiện | Hiện trạng |
+|---|---|
+| StorageClass cho phép mở rộng | `gp3` có `allowVolumeExpansion: true` (`ebs-csi-cotroller.tf`; provider kubernetes cũng mặc định `true`) |
+| Driver có quyền `ec2:ModifyVolume` | Role `ebs-csi-controller-role` dùng `AmazonEBSCSIDriverPolicy` |
+| PVC sửa được qua Helm | Chart tạo PVC `jenkins` độc lập, **không** dùng `volumeClaimTemplates` của StatefulSet, nên đổi `persistence.size` rồi `helm upgrade` là PVC được cập nhật |
+
+Kiểm tra nhanh:
+
+```bash
+kubectl get storageclass gp3 -o jsonpath='{.allowVolumeExpansion}{"\n"}'
+kubectl -n jenkins get pvc jenkins
+kubectl -n jenkins exec jenkins-0 -c jenkins -- df -h /var/jenkins_home
+```
+
+### Quy trình mở rộng (online, không cần restart pod)
+
+**Bước 1. Snapshot trước khi đổi** (mục [5.9](#59-sao-lưu-và-khôi-phục)):
+
+```bash
+VOL=$(kubectl get pv $(kubectl -n jenkins get pvc jenkins -o jsonpath='{.spec.volumeName}') -o jsonpath='{.spec.csi.volumeHandle}')
+aws ec2 create-snapshot --volume-id "$VOL" --description "jenkins-home before resize $(date +%F)" --region ap-southeast-1
+```
+
+**Bước 2. Tăng dung lượng.** Sửa `persistence.size` trong `helm-install/jenkins/jenkins/values.yaml` (ví dụ `"20Gi"` → `"50Gi"`), commit, rồi:
+
+```bash
+helm upgrade jenkins ./helm-install/jenkins/jenkins -n jenkins -f ./helm-install/jenkins/jenkins/values.yaml
+```
+
+Khi cần xử lý gấp, có thể patch trực tiếp PVC, **nhưng phải sửa `values.yaml` ngay sau đó**. Nếu không, lần `helm upgrade` sau sẽ cố đặt lại size nhỏ hơn và bị Kubernetes từ chối (PVC không cho thu nhỏ):
+
+```bash
+kubectl -n jenkins patch pvc jenkins -p '{"spec":{"resources":{"requests":{"storage":"50Gi"}}}}'
+```
+
+**Bước 3. Theo dõi.** EBS CSI tăng kích thước volume EBS, sau đó kubelet mở rộng filesystem ext4 ngay khi pod đang chạy:
+
+```bash
+kubectl -n jenkins get pvc jenkins -w
+kubectl -n jenkins describe pvc jenkins | tail -10
+kubectl -n jenkins exec jenkins-0 -c jenkins -- df -h /var/jenkins_home
+```
+
+Kết quả mong đợi: các event `Resizing` → `VolumeResizeSuccessful` (phía AWS) → `FileSystemResizeSuccessful` (phía node), `CAPACITY` của PVC đổi sang `50Gi`, và `df` hiển thị dung lượng mới. Thường mất từ vài chục giây đến vài phút.
+
+Nếu PVC dừng ở điều kiện `FileSystemResizePending` quá lâu, filesystem sẽ được mở rộng ở lần mount kế tiếp: `kubectl -n jenkins delete pod jenkins-0` (Jenkins gián đoạn khoảng 5 phút).
+
+### Giới hạn cần biết
+
+| Giới hạn | Ý nghĩa với vận hành |
+|---|---|
+| **Không thu nhỏ được** | Chỉ tăng. Muốn giảm phải tạo volume mới và copy dữ liệu, nên tăng theo từng bậc hợp lý (ví dụ 20 → 50 → 100Gi), không tăng quá tay |
+| **6 giờ mới sửa được một lần** trên cùng volume EBS | Sau một lần đổi, volume ở trạng thái `optimizing` và AWS chặn lần sửa tiếp theo trong 6 giờ. Hãy tăng đủ một lần, đừng tăng nhiều lần nhỏ |
+| Volume EBS gắn với một AZ | Mở rộng không đổi AZ; vẫn cần node ở AZ đó (`min_size = 3`) |
+| IOPS/throughput không tự tăng theo size | gp3 mặc định 3000 IOPS / 125 MiB/s bất kể dung lượng. Nếu nghẽn I/O (UI chậm, load job chậm), tăng qua tham số StorageClass (`iops`, `throughput`, chỉ áp dụng cho volume mới) hoặc `VolumeAttributesClass` (Kubernetes 1.34) cho volume đang chạy; xem [2.5](02-sizing.md) |
+| Tối đa 64 TiB | Không phải giới hạn thực tế; nếu `JENKINS_HOME` vượt vài trăm GiB thì cần dọn dữ liệu hoặc tách controller, không phải tiếp tục tăng |
+
+### Phòng ngừa (để ít phải mở rộng)
+
+1. **Cảnh báo sớm:** cảnh báo ở 80% và 90% dựa trên metric của kubelet (cần Prometheus, xem [6.4.4](06-van-hanh-va-tu-dong-hoa.md#644-giám-sát-và-cảnh-báo)):
+   ```promql
+   kubelet_volume_stats_used_bytes{namespace="jenkins",persistentvolumeclaim="jenkins"}
+     / kubelet_volume_stats_capacity_bytes{namespace="jenkins",persistentvolumeclaim="jenkins"} > 0.8
+   ```
+2. **Giới hạn số build lưu lại:** `buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))` trong Jenkinsfile (repo `shopping-cart` đã có), cộng với global build discarder cho các job không tự khai báo.
+3. **Tìm thủ phạm trước khi tăng:**
+   ```bash
+   kubectl -n jenkins exec jenkins-0 -c jenkins -- sh -c 'du -sh /var/jenkins_home/* 2>/dev/null | sort -h | tail -10'
+   kubectl -n jenkins exec jenkins-0 -c jenkins -- sh -c 'du -sh /var/jenkins_home/jobs/*/branches/* 2>/dev/null | sort -h | tail -10'
+   ```
+   Các thủ phạm hay gặp: nhánh Multibranch đã xoá nhưng job còn (đặt orphaned item strategy), log build rất dài (test in quá nhiều log), thư mục `workspace/` trên controller (không nên có, vì không build trên controller), và `caches/`.
+4. **Đưa log build ra ngoài** (S3 hoặc CloudWatch, giai đoạn sau): phần này chiếm nhiều dung lượng nhất sau khi artifact đã lên S3.

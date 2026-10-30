@@ -86,7 +86,7 @@ Với `maxUnavailable: "0"`, PDB chặn mọi lần drain node đang chạy Jenk
 | Heap sau GC (old gen) | > 70% liên tục | Tăng heap hoặc RAM, giảm số build lưu lại |
 | Hàng đợi build (queue) | Build chờ > 2–5 phút | Tăng `containerCap`, thêm node, kiểm tra pod Pending |
 | Pod agent `Pending` | > 1 phút | Thiếu node: kiểm tra Cluster Autoscaler, `max_size`, quota |
-| Dung lượng `JENKINS_HOME` | > 80% | Mở rộng PVC (gp3 cho phép mở rộng online), giảm số build lưu lại |
+| Dung lượng `JENKINS_HOME` | > 80% | Mở rộng PVC online theo [5.13](05-huong-dan-trien-khai.md#513-mở-rộng-volume-jenkins_home-khi-gần-đầy), giảm số build lưu lại |
 | Thời gian phản hồi giao diện | > 2 giây | Kiểm tra CPU, GC và plugin nặng |
 
 Các lệnh kiểm tra nhanh:
