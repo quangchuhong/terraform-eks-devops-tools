@@ -10,7 +10,9 @@ deploymentStrategy: Recreate
 image:
   # Sonatype Official Public Image
   repository: sonatype/nexus3
-  tag: 3.68.1
+  # 3.71+ has no OrientDB (EOL, open critical CVEs); fresh installs use the embedded H2 database.
+  # Same version as the vendored nxrm-ha 85.0.0 chart.
+  tag: 3.85.0
   pullPolicy: IfNotPresent
 imagePullSecrets:
 
