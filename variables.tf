@@ -175,3 +175,9 @@ variable "environment" {
   default     = "dev"
 }
 */
+
+variable "node_disk_size" {
+  description = "Root EBS volume size (GiB) of the EKS nodes: container images + ephemeral storage of the CI pods"
+  type        = number
+  default     = 100
+}

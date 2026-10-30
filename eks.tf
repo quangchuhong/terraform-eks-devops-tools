@@ -60,6 +60,20 @@ module "eks" {
       max_size     = 10
       desired_size = 3
 
+      # Root volume (images + emptyDir/ephemeral storage). The 20 GiB default ran out:
+      # CI pods (Trivy Java DB, docker-in-docker, Maven) were evicted for ephemeral-storage.
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = var.node_disk_size
+            volume_type           = "gp3"
+            encrypted             = true
+            delete_on_termination = true
+          }
+        }
+      }
+
       cloudinit_pre_nodeadm = [
         {
           content_type = "application/node.eks.aws"
