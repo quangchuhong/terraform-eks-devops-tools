@@ -1,0 +1,11 @@
+<!-- Maven settings for CI. No secrets: credentials come from env vars bound by withCredentials. -->
+<settings>
+  <servers>
+    <server><id>nexus</id><username>${env.NX_USER}</username><password>${env.NX_PASS}</password></server>
+    <server><id>maven-releases</id><username>${env.NX_USER}</username><password>${env.NX_PASS}</password></server>
+    <server><id>maven-snapshots</id><username>${env.NX_USER}</username><password>${env.NX_PASS}</password></server>
+  </servers>
+  <mirrors>
+    <mirror><id>nexus</id><mirrorOf>*</mirrorOf><url>@NEXUS_URL@/repository/maven-public/</url></mirror>
+  </mirrors>
+</settings>

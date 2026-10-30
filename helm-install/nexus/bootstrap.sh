@@ -2,17 +2,21 @@
 # Configure a fresh Nexus for the CI/CD pipelines, through the REST API on a port-forward:
 #   - Docker Bearer Token realm
 #   - docker-hosted (8000), docker-proxy -> Docker Hub (8002), docker-group (8001)
-#   - role ci-role + user ci-jenkins (read maven-public/docker-group, deploy maven + docker-hosted)
+#   - npm-proxy/npm-hosted/npm-group and pypi-proxy/pypi-hosted/pypi-group (shared library ci-lib)
+#   - role ci-role + user ci-jenkins (read the groups, deploy maven, docker-hosted, npm-hosted, pypi-hosted)
 #   - the ci-jenkins password is generated here and stored only in the Kubernetes secret
 #     jenkins/nexus-ci (keys: username, password), for the Jenkins credentials.
-# Re-runnable: existing repositories/role/user are kept, the ci-jenkins password is rotated.
+# Re-runnable: existing repositories/user are kept, ci-role privileges are updated, and the
+# ci-jenkins password is rotated unless ROTATE_CI_PASSWORD=no (then Jenkins needs no restart).
 #
-# Usage: ./helm-install/nexus/bootstrap.sh   (asks for the Nexus admin password)
+# Usage: ./helm-install/nexus/bootstrap.sh                          (asks for the Nexus admin password)
+#        ROTATE_CI_PASSWORD=no ./helm-install/nexus/bootstrap.sh    (add repositories/privileges only)
 set -euo pipefail
 
 NS="${NS:-nexus}"
 PORT="${PORT:-18081}"
 CI_USER="ci-jenkins"
+ROTATE_CI_PASSWORD="${ROTATE_CI_PASSWORD:-yes}"
 URL="http://127.0.0.1:${PORT}/service/rest"
 
 read -r -s -p "Nexus admin password: " ADMIN_PASS; echo
@@ -78,9 +82,30 @@ call POST /v1/repositories/docker/group '{
   "docker": {"v1Enabled": false, "forceBasicAuth": true, "httpPort": 8001}
 }'
 
-call POST /v1/security/roles '{
+# npm and PyPI (Python, Node.js apps of the shared library ci-lib)
+for fmt in npm pypi; do
+  if [ "$fmt" = npm ]; then remote="https://registry.npmjs.org"; else remote="https://pypi.org"; fi
+  call POST /v1/repositories/${fmt}/proxy "{
+    \"name\": \"${fmt}-proxy\", \"online\": true,
+    \"storage\": {\"blobStoreName\": \"default\", \"strictContentTypeValidation\": true},
+    \"proxy\": {\"remoteUrl\": \"${remote}\", \"contentMaxAge\": 1440, \"metadataMaxAge\": 1440},
+    \"negativeCache\": {\"enabled\": true, \"timeToLive\": 1440},
+    \"httpClient\": {\"blocked\": false, \"autoBlock\": true}
+  }"
+  call POST /v1/repositories/${fmt}/hosted "{
+    \"name\": \"${fmt}-hosted\", \"online\": true,
+    \"storage\": {\"blobStoreName\": \"default\", \"strictContentTypeValidation\": true, \"writePolicy\": \"allow_once\"}
+  }"
+  call POST /v1/repositories/${fmt}/group "{
+    \"name\": \"${fmt}-group\", \"online\": true,
+    \"storage\": {\"blobStoreName\": \"default\", \"strictContentTypeValidation\": true},
+    \"group\": {\"memberNames\": [\"${fmt}-hosted\", \"${fmt}-proxy\"]}
+  }"
+done
+
+ROLE='{
   "id": "ci-role", "name": "ci-role",
-  "description": "Jenkins CI: read maven-public/docker-group, deploy maven-releases/snapshots and docker-hosted",
+  "description": "Jenkins CI: read the group repositories, deploy maven-releases/snapshots, docker-hosted, npm-hosted, pypi-hosted",
   "privileges": [
     "nx-repository-view-maven2-maven-public-read",
     "nx-repository-view-maven2-maven-public-browse",
@@ -88,10 +113,24 @@ call POST /v1/security/roles '{
     "nx-repository-view-maven2-maven-snapshots-*",
     "nx-repository-view-docker-docker-hosted-*",
     "nx-repository-view-docker-docker-group-read",
-    "nx-repository-view-docker-docker-group-browse"
+    "nx-repository-view-docker-docker-group-browse",
+    "nx-repository-view-npm-npm-group-read",
+    "nx-repository-view-npm-npm-group-browse",
+    "nx-repository-view-npm-npm-hosted-*",
+    "nx-repository-view-pypi-pypi-group-read",
+    "nx-repository-view-pypi-pypi-group-browse",
+    "nx-repository-view-pypi-pypi-hosted-*"
   ],
   "roles": []
 }'
+call POST /v1/security/roles "$ROLE"
+# On a re-run the role already exists: update its privileges
+call PUT /v1/security/roles/ci-role "$ROLE"
+
+if [ "$ROTATE_CI_PASSWORD" = "no" ] && kubectl -n jenkins get secret nexus-ci >/dev/null 2>&1; then
+  echo "Done. ROTATE_CI_PASSWORD=no: ${CI_USER} and secret jenkins/nexus-ci unchanged"
+  exit 0
+fi
 
 CI_PASS=$(openssl rand -base64 30 | tr -d '/+=' | cut -c1-32)
 call POST /v1/security/users "{

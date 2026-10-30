@@ -19,6 +19,7 @@ Jenkins là công cụ CI của nền tảng DevOps trên EKS (`eks-cluster-ver1
 4. [So sánh với các công cụ CI/CD khác](04-so-sanh-cong-cu-ci-cd.md): GitLab CI, GitHub Actions, Tekton/Argo Workflows, AWS CodeBuild/CodePipeline, Azure DevOps.
 5. [Hướng dẫn cấu hình đã triển khai](05-huong-dan-trien-khai.md): các bước cài, Secret, đăng nhập, kiểm tra, nâng cấp, sao lưu, sự cố đã gặp, artifact trên S3, mở rộng volume `JENKINS_HOME`, lưu trữ log build lên S3 (Object Lock 12 tháng).
 6. [Vận hành và tự động hoá (enterprise)](06-van-hanh-va-tu-dong-hoa.md): mô hình vận hành, SLO, lịch định kỳ, quy trình nâng cấp an toàn, tự động hoá (image có sẵn plugin, Renovate, pipeline platform, cảnh báo bảo mật, Prometheus, sao lưu DLM, Shared Library, ApplicationSet), runbook sự cố, lộ trình áp dụng.
+7. [Shared Library dùng chung (`ci-lib`)](07-shared-library.md): pipeline chuẩn cho Java/Spring Boot (Maven), Python, Node.js; tham số, contract với từng loại repo, chuẩn bị Jenkins/Nexus, quản lý phiên bản, bảo mật (trusted library, cổng Trivy/Quality Gate, waiver có hạn), chuyển `shopping-cart` sang thư viện. Mã nguồn: [`helm-install/jenkins/shared-library/`](../../helm-install/jenkins/shared-library/).
 
 ## Tóm tắt nhanh
 

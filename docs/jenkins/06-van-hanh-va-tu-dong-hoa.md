@@ -279,7 +279,7 @@ Nhờ JCasC, Secret và plugin đều là code, bản snapshot chủ yếu giữ
 | Thành phần | Cách làm |
 |---|---|
 | **Job** | Dùng **Organization Folder** của `gitlab-branch-source`: quét cả group GitLab, repo nào có `Jenkinsfile` thì tự có job. Không cần tạo job tay. Nếu cần job đặc thù, dùng **Job DSL** (plugin `job-dsl`) với một seed job đọc file `.groovy` từ Git |
-| **Pipeline dùng chung** | **Shared Library** (repo `devops/ci-cd/jenkins-shared-library`, khai báo bằng JCasC `globalLibraries`). Các bước Maven, Sonar, Trivy, push image thành hàm `mavenPipeline(...)`. Mỗi repo chỉ cần vài dòng `Jenkinsfile` |
+| **Pipeline dùng chung** | **Shared Library** `ci-lib` (repo `devops/ci-cd/jenkins-shared-library`, khai báo bằng JCasC `globalLibraries`): `ciPipeline(type: 'maven' / 'python' / 'node', ...)`. Mỗi repo chỉ cần vài dòng `Jenkinsfile`. Chi tiết: [7](07-shared-library.md) |
 | **Folder và quyền theo team** | JCasC hoặc Job DSL tạo folder cho mỗi team, gán quyền `matrix-auth` theo nhóm của IdP |
 | **Onboarding team mới** | MR thêm team vào file cấu hình (tên group GitLab, nhóm IdP), pipeline platform áp dụng |
 

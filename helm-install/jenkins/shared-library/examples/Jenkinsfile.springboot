@@ -1,0 +1,11 @@
+// Spring Boot 1.5 on Java 8 (shopping-cart). Builds on JDK 8, analyses with JDK 17.
+// trivyWaiverUntil: Spring Boot 1.5 has many HIGH/CRITICAL CVEs until it is upgraded;
+// the waiver is approved by Security and must be renewed (or removed) before that date.
+@Library('ci-lib@v1.0.0') _
+
+ciPipeline(
+  type: 'maven',
+  name: 'shopping-cart',
+  javaVersion: '8',
+  trivyWaiverUntil: '2026-12-31'
+)

@@ -1,0 +1,9 @@
+// Java library (no container image): build, test, Sonar, deploy the jar to Nexus.
+@Library('ci-lib@v1.0.0') _
+
+ciPipeline(
+  type: 'maven',
+  name: 'common-utils',
+  javaVersion: '21',
+  buildImage: false
+)

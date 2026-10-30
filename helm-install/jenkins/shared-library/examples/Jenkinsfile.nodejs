@@ -1,0 +1,9 @@
+// Node.js service (Express/NestJS) or frontend build: npm ci, lint, test:ci, build, Sonar, image.
+@Library('ci-lib@v1.0.0') _
+
+ciPipeline(
+  type: 'node',
+  name: 'customer-portal',
+  nodeVersion: '22',
+  imageGroup: 'dev-frontend'
+)

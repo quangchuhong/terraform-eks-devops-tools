@@ -1,0 +1,8 @@
+// Python service (FastAPI/Flask/Django): pytest + coverage, Sonar, image.
+@Library('ci-lib@v1.0.0') _
+
+ciPipeline(
+  type: 'python',
+  name: 'payment-api',
+  pythonVersion: '3.12'
+)
