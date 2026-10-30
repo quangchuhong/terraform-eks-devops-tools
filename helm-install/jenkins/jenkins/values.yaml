@@ -1147,7 +1147,8 @@ agent:
     # -- Repository to pull the agent jnlp image from
     repository: "jenkins/inbound-agent"
     # -- Tag of the image to pull
-    tag: "3355.v388858a_47b_33-3"
+    # JDK 21 variant: the controller (2.580) is built for Java 21, a JDK 17 agent cannot connect
+    tag: "3355.v388858a_47b_33-3-jdk21"
   # -- Configure working directory for default agent
   workingDir: "/home/jenkins/agent"
   nodeUsageMode: "NORMAL"
