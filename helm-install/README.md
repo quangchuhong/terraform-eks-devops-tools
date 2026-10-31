@@ -49,6 +49,13 @@ Docker repositories: give each one an HTTP connector on the port the Service exp
 Also enable *Security -> Realms -> Docker Bearer Token Realm*. The registries are plain HTTP, so
 clients need `insecure-registries` (Docker) or `--tls-verify=false` / `--insecure` (Kaniko/Buildah).
 
+Extra repositories for every technology (Docker proxies for ghcr/quay/k8s/ECR Public/MCR/GCR, Gradle,
+Conan, vcpkg, apt, yum, apk, Chocolatey, PowerShell Gallery, cloud CLIs), see `docs/nexus/07-cau-hinh-theo-cong-nghe.md`:
+
+```sh
+./helm-install/nexus/repos-extra.sh
+```
+
 ## 3. SonarQube
 
 ```sh
