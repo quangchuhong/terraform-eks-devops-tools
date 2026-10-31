@@ -1,6 +1,6 @@
 # DevOps tools on EKS (helm CLI)
 
-Jenkins, Nexus, SonarQube and Trivy are installed with the helm CLI from the charts in this folder.
+Jenkins, Nexus, SonarQube, Trivy and GitLab Runner are installed with the helm CLI from this folder.
 GitLab stays in Terraform (`gitlab-helm.tf`).
 
 All web apps share the GitLab ALB (Ingress group `alb-apps`, HTTP 80 only). The
@@ -66,10 +66,27 @@ helm upgrade --install trivy ./helm-install/trivy-scanner/trivy -n trivy --creat
 In-cluster endpoint for pipelines: `trivy image --server http://trivy.trivy:9090 <image>`.
 The Ingress is off because the server has no authentication. Set `trivy.serverToken` before turning it on.
 
+## 5. GitLab Runner
+
+Job pods run on the CI node group `ci_agents` (shared with the Jenkins agents); needs `terraform apply` first.
+Create an instance runner in GitLab (Admin > CI/CD > Runners > New instance runner), then store its
+`glrt-` token in a Secret (never in a file):
+
+```sh
+kubectl create namespace gitlab-runner
+read -r -s -p "Runner token (glrt-...): " RUNNER_TOKEN; echo
+kubectl -n gitlab-runner create secret generic gitlab-runner-token \
+  --from-literal=runner-registration-token="" --from-literal=runner-token="$RUNNER_TOKEN"
+unset RUNNER_TOKEN
+helm repo add gitlab https://charts.gitlab.io && helm repo update gitlab
+helm upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.94.0 \
+  -n gitlab-runner -f ./helm-install/gitlab-runner/values.yaml
+```
+
 ## Check
 
 ```sh
-kubectl get pods -A | grep -E 'jenkins|nexus|sonarqube|trivy'
+kubectl get pods -A | grep -E 'jenkins|nexus|sonarqube|trivy|gitlab-runner'
 kubectl get ingress -A
 ```
 

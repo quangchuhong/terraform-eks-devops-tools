@@ -350,19 +350,57 @@ aws s3 ls s3://$(terraform output -raw jenkins_artifacts_bucket)/jenkins/ --recu
 
 ### GitLab Runner dùng chung node group CI
 
-Khi cài GitLab Runner (Kubernetes executor), đặt pod job lên cùng node group:
+GitLab Runner (Kubernetes executor) cài bằng helm CLI, cấu hình ở `helm-install/gitlab-runner/values.yaml`:
 
-```toml
-[[runners]]
-  [runners.kubernetes]
-    namespace = "gitlab-runner"
-    [runners.kubernetes.node_selector]
-      workload = "ci-agents"
-    [runners.kubernetes.node_tolerations]
-      "workload=ci-agents" = "NoSchedule"
+| Thành phần | Cấu hình |
+|---|---|
+| Chart | `gitlab/gitlab-runner` **0.94.0** (runner 19.5, khớp GitLab 19.5.3) |
+| Runner manager (Deployment) | Namespace `gitlab-runner`, chạy trên node thường; chờ job xong tối đa 1 giờ khi bị thay thế |
+| Pod **job** | `nodeSelector workload=ci-agents` + toleration, cùng node group với agent Jenkins; không privileged; request 500m/1Gi, limit 2 CPU/4Gi, ephemeral storage tối đa 20Gi |
+| Quyền Kubernetes | Role tối thiểu trong namespace `gitlab-runner` (pods, exec/attach, log, secrets, configmaps, services) |
+| Xác thực | Token `glrt-…` của runner tạo trên GitLab, nằm trong Secret `gitlab-runner/gitlab-runner-token` (không nằm trong Git) |
+
+**Cài đặt** (sau khi `terraform apply` đã tạo node group `ci_agents`):
+
+1. Trên GitLab: **Admin → CI/CD → Runners → New instance runner**. Tags: `eks`, `k8s`; bỏ chọn *Run untagged jobs* nếu muốn chỉ job có tag mới chạy ở đây. Bấm **Create runner**, copy token `glrt-…` (chỉ hiện một lần).
+2. Tạo Secret và cài chart:
+   ```bash
+   kubectl create namespace gitlab-runner
+   read -r -s -p "Runner token (glrt-...): " RUNNER_TOKEN; echo
+   kubectl -n gitlab-runner create secret generic gitlab-runner-token --from-literal=runner-registration-token="" --from-literal=runner-token="$RUNNER_TOKEN"
+   unset RUNNER_TOKEN
+   helm repo add gitlab https://charts.gitlab.io
+   helm repo update gitlab
+   helm upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.94.0 -n gitlab-runner -f ./helm-install/gitlab-runner/values.yaml
+   ```
+3. Kiểm tra: `kubectl -n gitlab-runner get pods` (pod `gitlab-runner-…` Running) và log có `Runner registered successfully` hoặc `Configuration loaded`; trên GitLab, runner hiện trạng thái **Online**.
+
+**Thử một job** (`.gitlab-ci.yml` trong một project bất kỳ):
+
+```yaml
+test-runner:
+  tags: [eks]
+  image: alpine:3.22
+  script:
+    - echo "node=$(cat /etc/hostname)"
+    - uname -a
 ```
 
-Pod của chính GitLab Runner (manager) có thể chạy ở node thường. Chỉ pod **job** cần lên node CI.
+Trong khi job chạy: `kubectl -n gitlab-runner get pods -o wide`. Pod `runner-…` phải nằm trên node có `workload=ci-agents` (`kubectl get nodes -L workload`).
+
+**Build image trong GitLab CI:** pod job không privileged, nên không dùng `docker:dind`. Dùng Kaniko hoặc BuildKit rootless, ví dụ:
+
+```yaml
+build-image:
+  tags: [eks]
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile Dockerfile --no-push
+```
+
+Đẩy image lên Nexus (registry HTTP) cần thêm `--insecure` và file `/kaniko/.docker/config.json` lấy từ biến CI dạng *masked*. Phần này làm khi chuyển pipeline sang GitLab CI.
 
 ## 5.13. Mở rộng volume `JENKINS_HOME` khi gần đầy
 
