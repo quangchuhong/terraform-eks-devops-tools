@@ -13,6 +13,7 @@ Tài liệu liên quan:
 
 - Jenkins: [kiến trúc](../jenkins/01-kien-truc-va-cau-hinh.md), [sizing và scale](../jenkins/02-sizing.md), [hướng dẫn triển khai](../jenkins/05-huong-dan-trien-khai.md) (5.12 artifact S3 và node group, 5.14 log build lên S3), [Shared Library](../jenkins/07-shared-library.md).
 - Cài nhanh các tool: [`helm-install/README.md`](../../helm-install/README.md).
+- Manifest GitLab Runner sinh từ `helm template`: [gitlab-runner-manifest.md](gitlab-runner-manifest.md).
 
 ## 1. Vì sao tách node group cho build
 

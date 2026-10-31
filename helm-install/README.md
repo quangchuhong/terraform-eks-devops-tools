@@ -90,6 +90,17 @@ helm upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.94.0 \
   -n gitlab-runner -f ./helm-install/gitlab-runner/values.yaml
 ```
 
+## Review the rendered manifests (helm template)
+
+`render.sh` renders every chart with the deployed values into `helm-install/rendered/` (git-ignored),
+and with `DIFF=1` compares with the release in the cluster (`helm get manifest`, Secrets excluded).
+Guide: `docs/helm-template/README.md`.
+
+```sh
+./helm-install/render.sh
+DIFF=1 ./helm-install/render.sh jenkins nexus trivy gitlab-runner gitlab
+```
+
 ## Check
 
 ```sh

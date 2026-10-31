@@ -20,6 +20,7 @@ Trivy là công cụ quét bảo mật mã nguồn mở (Aqua Security, Apache 2
 5. [Hướng dẫn cấu hình đã triển khai](05-huong-dan-trien-khai.md): cài server, cách pipeline gọi Trivy, kiểm tra, nâng cấp, sự cố đã gặp.
 6. [Vận hành và tự động hoá](06-van-hanh-va-tu-dong-hoa.md): cập nhật DB, mirror DB nội bộ, quản lý ngoại lệ, SBOM và Dependency-Track, Trivy Operator, runbook.
 7. [Cách dùng theo loại quét](07-cach-dung-theo-loai-quet.md): image, filesystem/repo, SBOM, IaC (Terraform, Kubernetes, Dockerfile), secret, license, cụm Kubernetes.
+8. [Manifest sinh từ `helm template`](08-manifest-helm-template.md): StatefulSet, Service, ConfigMap, Secret của Trivy server; nhận xét (chart deprecated, chưa có token).
 
 ## Tóm tắt nhanh
 

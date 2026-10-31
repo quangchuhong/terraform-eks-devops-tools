@@ -21,6 +21,7 @@ Nexus Repository là kho artifact tập trung của nền tảng DevOps trên EK
 5. [Hướng dẫn cấu hình đã triển khai](05-huong-dan-trien-khai.md): cài đặt, Docker connector, bootstrap, kiểm tra, mở rộng dung lượng, nâng cấp, sao lưu, sự cố đã gặp.
 6. [Vận hành và tự động hoá (enterprise)](06-van-hanh-va-tu-dong-hoa.md): lịch định kỳ, cleanup policy, task, sao lưu và khôi phục, giám sát, cấu hình bằng code, runbook.
 7. [Cấu hình và sử dụng theo công nghệ](07-cau-hinh-theo-cong-nghe.md): **Docker proxy, Maven/Java/Gradle, Python, Node.js, C/C++ (Conan, vcpkg), Linux (apt, yum, apk), Windows (NuGet, Chocolatey, PowerShell), AWS, GCP, Azure**.
+8. [Manifest sinh từ `helm template`](08-manifest-helm-template.md): Deployment, PVC, Service, Ingress của chart và Docker connector; giải thích cấu hình và nhận xét.
 
 Liên quan: [Jenkins](../jenkins/README.md) (pipeline dùng Nexus), [Shared Library `ci-lib`](../jenkins/07-shared-library.md), [CI agents](../ci-agents/README.md).
 

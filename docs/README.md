@@ -13,3 +13,5 @@ Tài liệu cho các DevOps tool chạy trên cụm EKS `eks-cluster-ver1` (acco
 | Argo CD | CD theo GitOps | Chưa triển khai |
 
 Hướng dẫn cài nhanh các tool: [`helm-install/README.md`](../helm-install/README.md).
+
+Xem và kiểm tra manifest Kubernetes thật sự được deploy (render bằng `helm template`, so sánh với cụm): [`helm-template/`](helm-template/README.md).

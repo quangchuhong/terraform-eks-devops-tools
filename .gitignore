@@ -43,3 +43,6 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# helm template output (helm-install/render.sh): may contain generated secrets
+helm-install/rendered/

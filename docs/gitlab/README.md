@@ -19,6 +19,7 @@ GitLab là nơi quản lý mã nguồn của nền tảng DevOps trên EKS (`eks
 4. [So sánh với các nền tảng quản lý mã nguồn khác](04-so-sanh-cong-cu-scm.md): GitHub Enterprise, Bitbucket Data Center, Azure DevOps Server, Gitea/Forgejo, AWS CodeCommit; CE so với Premium/Ultimate.
 5. [Hướng dẫn cấu hình đã triển khai](05-huong-dan-trien-khai.md): các bước cài bằng Terraform, đăng nhập, cấu hình ban đầu, group/project/token cho CI, kiểm tra, nâng cấp, sao lưu, sự cố đã gặp.
 6. [Vận hành và tự động hoá (enterprise)](06-van-hanh-va-tu-dong-hoa.md): mô hình vận hành, SLO, lịch định kỳ, nâng cấp theo upgrade path, sao lưu và khôi phục, giám sát, quản lý group/project bằng code, dọn dẹp, runbook sự cố, lộ trình áp dụng.
+7. [Manifest sinh từ `helm template`](07-manifest-helm-template.md): 61 tài nguyên của chart (Deployment, StatefulSet Gitaly, Service, Ingress, HPA, PDB, hook), cấu hình được render, nhận xét.
 
 Liên quan: [GitLab Runner và hạ tầng chạy build](../ci-agents/README.md), [Jenkins](../jenkins/README.md).
 
