@@ -9,7 +9,7 @@ Tài liệu cho các DevOps tool chạy trên cụm EKS `eks-cluster-ver1` (acco
 | GitLab | Quản lý mã nguồn, repo GitOps, GitLab CI | [gitlab/](gitlab/README.md) |
 | Nexus | Kho artifact và proxy: Maven, npm, PyPI, NuGet, Docker, gói Linux/Windows, Conan, công cụ cloud | [nexus/](nexus/README.md) |
 | SonarQube | Phân tích chất lượng mã, Quality Gate | Đang viết |
-| Trivy | Quét lỗ hổng image | Đang viết |
+| Trivy | Quét lỗ hổng image, thư viện, IaC, secret, cụm Kubernetes; so sánh với Black Duck | [trivy/](trivy/README.md) |
 | Argo CD | CD theo GitOps | Chưa triển khai |
 
 Hướng dẫn cài nhanh các tool: [`helm-install/README.md`](../helm-install/README.md).
