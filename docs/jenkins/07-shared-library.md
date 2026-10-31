@@ -449,6 +449,15 @@ Các bước:
 3. So sánh với build cũ: số test, coverage và Quality Gate trên SonarQube, báo cáo Trivy trong artifact.
 4. Merge vào `develop`, kiểm tra image `…/dev-backend/shopping-cart:<version>-<commit>` có trên Nexus.
 
+**Kết quả chuyển đổi (31/10/2026):**
+
+| Nhánh | Kết quả | Ghi chú |
+|---|---|---|
+| `feature/ci-lib` (build #1) | ✅ UNSTABLE (đúng thiết kế) | 8 stage; Sonar Quality Gate `OK`; Publish và Push bỏ qua; image `0.0.1-SNAPSHOT-f26f04d`; Trivy 148 HIGH/CRITICAL (1 trong `brotli-libs` của image nền, 147 trong `app.jar` do Spring Boot 1.5.3) → chấp nhận nhờ waiver đến 2026-12-31; 3 artifact (`trivy-report.json`, `trivy-report.txt`, `sbom.cdx.json`) lên S3 |
+| `develop` | ✅ | Publish jar lên `maven-snapshots`, push image lên `docker-hosted` |
+
+Việc tiếp theo cho `shopping-cart`: build với image nền mới (`docker build --pull`) để hết CVE của OS; nâng Spring Boot 1.5 → 2.7 (vẫn Java 8) rồi 3.x (Java 17) để hết CVE thư viện; xoá `sonar.jacoco.reportPath` (property cũ) trong `pom.xml`; bỏ `trivyWaiverUntil` khi đã sạch.
+
 ## 7.10. Mở rộng thư viện
 
 | Nhu cầu | Cách làm |
