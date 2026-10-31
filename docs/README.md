@@ -5,6 +5,7 @@ Tài liệu cho các DevOps tool chạy trên cụm EKS `eks-cluster-ver1` (acco
 | Tool | Vai trò | Tài liệu |
 |---|---|---|
 | Jenkins | CI: build, test, quét chất lượng và bảo mật, đẩy artifact | [jenkins/](jenkins/README.md) |
+| CI agents | Hạ tầng chạy build: node group `ci_agents` dùng chung cho Jenkins agent và GitLab Runner, artifact và log build trên S3 | [ci-agents/](ci-agents/README.md) |
 | GitLab | Quản lý mã nguồn, GitOps repo | Đang viết |
 | Nexus | Maven repository, Docker registry | Đang viết |
 | SonarQube | Phân tích chất lượng mã, Quality Gate | Đang viết |
