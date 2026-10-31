@@ -50,7 +50,7 @@ kubectl -n jenkins wait --for=condition=Ready pod/jenkins-0 --timeout=15m
 kubectl -n jenkins get ingress
 ```
 
-- Lần khởi động nào cũng mất khoảng **4–5 phút** để init container cài 124 plugin. Cảnh báo `Startup probe failed` trong lúc này là bình thường.
+- Lần khởi động nào cũng mất khoảng **4–5 phút** để init container cài 127 plugin. Cảnh báo `Startup probe failed` trong lúc này là bình thường.
 - Ingress phải có ADDRESS trùng với ALB của GitLab (`k8s-albapps-...`).
 - Cột `APP VERSION 2.528.3` trong `helm history` là phiên bản mặc định của chart. Phiên bản chạy thật là `2.580.2` (ghi đè bằng `controller.image.tag`).
 
@@ -88,7 +88,7 @@ Sign-up allowed                    false
 Anonymous can READ                 false
 CSRF crumb issuer                  hudson.security.csrf.DefaultCrumbIssuer
 System credentials                 [nexus-creds (...), docker-user-internal (...), sonarqube-token (...), gitlab-token-dev-group (...)]
-Installed plugins                  124
+Installed plugins                  127
 Core warnings                      []
 Plugin warnings                    []
 ```
@@ -333,7 +333,7 @@ PVC `jenkins` vẫn còn sau lệnh trên. Chỉ xoá PVC (`kubectl -n jenkins d
    helm upgrade --install jenkins ./helm-install/jenkins/jenkins -n jenkins --timeout 15m
    kubectl -n jenkins wait --for=condition=Ready pod/jenkins-0 --timeout=15m
    ```
-   Nếu init container báo `PluginDependencyException`, xử lý như mục 5.8. Khi chạy ổn, ghim `artifact-manager-s3` và các dependency mới bằng `security-audit/run.sh plugins.groovy`.
+   Nếu init container báo `PluginDependencyException`, xử lý như mục 5.8. `artifact-manager-s3` và hai dependency mới (`aws-global-configuration`, `oss-symbols-api`) đã được ghim phiên bản.
 3. **Jenkinsfile của app** (đã có `nodeSelector` + toleration): push lên GitLab rồi chạy build. Nếu đổi Jenkinsfile trước khi có node group, pod agent sẽ `Pending` mãi.
 
 ### Kiểm tra

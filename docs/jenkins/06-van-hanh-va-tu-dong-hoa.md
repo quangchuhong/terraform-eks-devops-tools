@@ -90,7 +90,7 @@ COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt --latest false --verbose
 ```
 
-- `plugins.txt` là danh sách 124 plugin đã ghim (lấy từ `security-audit/run.sh plugins.groovy`, bỏ tiền tố `- `).
+- `plugins.txt` là danh sách 127 plugin đã ghim (lấy từ `security-audit/run.sh plugins.groovy`, bỏ tiền tố `- `).
 - Build bằng pipeline, quét bằng Trivy, rồi push lên registry nội bộ (Nexus `docker-hosted` hoặc ECR).
 
 Values khi dùng image này:

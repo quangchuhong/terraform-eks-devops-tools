@@ -37,7 +37,7 @@ flowchart TB
 | Kết nối agent | `Service/jenkins-agent` (ClusterIP 50000) | Agent kết nối qua JNLP trong cụm |
 | Cấu hình | ConfigMap JCasC + sidecar `config-reload` | Sửa ConfigMap thì JCasC tự nạp lại |
 | Quyền Kubernetes | `ServiceAccount/jenkins` + Role/RoleBinding trong namespace `jenkins` | Chỉ quản lý pod agent; **không** đọc Secret (`rbac.readSecrets: false`) |
-| Plugin | Cài lúc pod khởi động (init container `init`) | 124 plugin, đã ghim phiên bản |
+| Plugin | Cài lúc pod khởi động (init container `init`) | 127 plugin, đã ghim phiên bản |
 
 ### Vòng đời một build
 

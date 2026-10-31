@@ -60,7 +60,7 @@ Kiểm tra bằng `helm-install/jenkins/security-audit/run.sh` (chỉ đọc). L
 | Hạng mục | Trạng thái |
 |---|---|
 | Phiên bản core | ✅ 2.580.2 (LTS), không có cảnh báo bảo mật |
-| Plugin | ✅ 124 plugin ghim phiên bản, không có cảnh báo, không có bản cập nhật chờ |
+| Plugin | ✅ 127 plugin ghim phiên bản, không có cảnh báo bảo mật |
 | Đăng ký tài khoản | ✅ Tắt |
 | Truy cập ẩn danh | ✅ Không được xem gì |
 | CSRF | ✅ Bật |
