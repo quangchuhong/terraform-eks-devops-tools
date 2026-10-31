@@ -455,6 +455,7 @@ Các bước:
 |---|---|---|
 | `feature/ci-lib` (build #1) | ✅ UNSTABLE (đúng thiết kế) | 8 stage; Sonar Quality Gate `OK`; Publish và Push bỏ qua; image `0.0.1-SNAPSHOT-f26f04d`; Trivy 148 HIGH/CRITICAL (1 trong `brotli-libs` của image nền, 147 trong `app.jar` do Spring Boot 1.5.3) → chấp nhận nhờ waiver đến 2026-12-31; 3 artifact (`trivy-report.json`, `trivy-report.txt`, `sbom.cdx.json`) lên S3 |
 | `develop` | ✅ | Publish jar lên `maven-snapshots`, push image lên `docker-hosted` |
+| `main` | Giữ Jenkinsfile cũ (theo quyết định của chủ repo) | Không merge `develop` vào `main` kèm Jenkinsfile mới; khi merge, giữ lại Jenkinsfile của `main` (`git merge --no-commit develop`, `git checkout main -- Jenkinsfile`, rồi commit) |
 
 Việc tiếp theo cho `shopping-cart`: build với image nền mới (`docker build --pull`) để hết CVE của OS; nâng Spring Boot 1.5 → 2.7 (vẫn Java 8) rồi 3.x (Java 17) để hết CVE thư viện; xoá `sonar.jacoco.reportPath` (property cũ) trong `pom.xml`; bỏ `trivyWaiverUntil` khi đã sạch.
 
