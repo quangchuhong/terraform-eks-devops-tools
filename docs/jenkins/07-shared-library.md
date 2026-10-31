@@ -75,7 +75,7 @@ Quy ước chung:
 | `type` | Có | — | `maven` (Java, Spring Boot), `python`, `node` |
 | `name` | Có | — | Tên app, dùng cho tên image |
 | `sonarProjectKey` | | `name` | Project key trên SonarQube |
-| `javaVersion` | | `17` | `8`, `17`, `21` (chỉ cho `maven`) |
+| `javaVersion` | | `17` | `8`, `11`, `17`, `21` (chỉ cho `maven`) |
 | `pythonVersion` | | `3.12` | `3.12`, `3.13` |
 | `nodeVersion` | | `22` | `22`, `24` |
 | `imageGroup` | | `dev-backend` | Thư mục image trên Nexus: `<registry>/<imageGroup>/<name>` |
@@ -83,6 +83,11 @@ Quy ước chung:
 | `buildImage` | | `true` | `false` cho thư viện (không có image) |
 | `publish` | | `true` với `maven`, `false` với loại khác | Đẩy package lên Nexus (jar, wheel, npm) |
 | `trivyWaiverUntil` | | — | `YYYY-MM-DD`: đến hết ngày này, lỗ hổng HIGH/CRITICAL chỉ làm build **UNSTABLE** |
+| `pomFile` | | `pom.xml` | (Maven) đường dẫn POM, ví dụ `services/api/pom.xml`; không chứa `..` |
+| `mavenGoals` | | `clean verify` | (Maven) goal của bước Build & Test; phải gồm test + JaCoCo |
+| `mavenArgs` | | (trống) | (Maven) tuỳ chọn thêm cho mọi lệnh `mvn` (build, Sonar, deploy), ví dụ `-Pci -pl api -am`. Chỉ cho phép chữ, số, khoảng trắng và `. _ : = , / @ + -` (chặn `;`, `$`, `\|`, `&`, nháy) |
+
+Với app Maven, dùng **`mavenPipeline(...)`**: giống `ciPipeline(type: 'maven', ...)` nhưng không cần ghi `type`.
 
 Tham số sai tên, sai loại hoặc phiên bản không có trong danh sách sẽ làm build dừng ngay với thông báo rõ ràng. Ví dụ `javaVersion: '11'` báo `maven version 11 not supported, use one of [8, 17, 21]`. Danh sách phiên bản và image do nhóm platform quản lý trong `ciConfig`, nên không ai dùng được image tuỳ ý.
 
@@ -95,12 +100,17 @@ Các giá trị `name`, `sonarProjectKey`, `imageGroup`, `dockerfile` được k
 ```groovy
 @Library('ci-lib@v1.0.0') _
 
-ciPipeline(
-  type: 'maven',
+mavenPipeline(
   name: 'shopping-cart',
   javaVersion: '8',
   trivyWaiverUntil: '2026-12-31'
 )
+```
+
+Dự án nhiều module (`helm-install/jenkins/shared-library/examples/Jenkinsfile.maven-multimodule`):
+
+```groovy
+mavenPipeline(name: 'payment-api', javaVersion: '17', mavenArgs: '-Pci -pl payment-api -am', dockerfile: 'payment-api/Dockerfile')
 ```
 
 **Thư viện chạy:**
@@ -159,7 +169,7 @@ Với Spring Boot 3.2 trở xuống, launcher là `org.springframework.boot.load
 ```groovy
 @Library('ci-lib@v1.0.0') _
 
-ciPipeline(type: 'maven', name: 'common-utils', javaVersion: '21', buildImage: false)
+mavenPipeline(name: 'common-utils', javaVersion: '21', buildImage: false)
 ```
 
 Pod không có container `docker` và `trivy`, nên nhẹ hơn. Jar được `mvn deploy` lên Nexus (từ `develop`, `release/*`, `main`); các app khác dùng qua `maven-public`.
@@ -281,24 +291,30 @@ Với frontend (React/Vue/Angular): stage cuối dùng `nginxinc/nginx-unprivile
 
 ### Bước 1. Tạo repo thư viện trên GitLab
 
-Tạo project `devops/ci-cd/jenkins-shared-library` trên GitLab (giao diện, không tạo README), rồi:
+Tạo project `devops/ci-cd/jenkins-shared-library` trên GitLab (giao diện, **không** tạo README), rồi từ thư mục repo `terraform-eks-devops-tools`:
 
 ```bash
-git clone http://gitlab.gitlabonlinecom.click/devops/ci-cd/jenkins-shared-library.git
-cp -r terraform-eks-devops-tools/helm-install/jenkins/shared-library/. jenkins-shared-library/
-cd jenkins-shared-library
+rm -rf /tmp/ci-lib
+cp -R helm-install/jenkins/shared-library /tmp/ci-lib
+cd /tmp/ci-lib
+rm -rf build .gradle
+gradle test
+git init -b main
 git add .
 git commit -m "ci-lib v1.0.0: Maven, Python, Node.js pipelines"
-git push origin main
+git remote add origin http://gitlab.gitlabonlinecom.click/devops/ci-cd/jenkins-shared-library.git
+git push -u origin main
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+`gradle test` là tuỳ chọn trên máy có Gradle (chạy 26 unit test, [7.12](#712-kiểm-thử-thư-viện)).
 
 Trên GitLab: **Settings → Repository → Protected branches**: `main` chỉ Maintainer được merge, không ai push trực tiếp. **Protected tags**: `v*` chỉ Maintainer tạo. Bật **Merge request approvals** (ít nhất 1–2 người nhóm platform) và thêm `CODEOWNERS`.
 
 ### Bước 2. Khai báo thư viện trong Jenkins (JCasC)
 
-Thêm vào `controller.JCasC.configScripts` trong `helm-install/jenkins/jenkins/values.yaml`:
+Đã có trong `controller.JCasC.configScripts.shared-library` của `helm-install/jenkins/jenkins/values.yaml`:
 
 ```yaml
       shared-library: |
@@ -334,7 +350,12 @@ helm upgrade jenkins ./helm-install/jenkins/jenkins -n jenkins -f ./helm-install
 
 (Bỏ `-f values-build-logs.yaml` nếu chưa áp dụng phần lưu log, mục [5.14](05-huong-dan-trien-khai.md#514-lưu-trữ-log-build-lên-s3).)
 
-Kiểm tra: **Manage Jenkins → System → Global Trusted Pipeline Libraries** có `ci-lib`.
+Sidecar `config-reload` nạp lại JCasC khi ConfigMap đổi, không cần khởi động lại Jenkins. Kiểm tra: **Manage Jenkins → System → Global Trusted Pipeline Libraries** có `ci-lib`, hoặc:
+
+```bash
+kubectl -n jenkins exec jenkins-0 -c jenkins -- ls /var/jenkins_home/casc_configs/
+kubectl -n jenkins logs jenkins-0 -c config-reload --tail=5
+```
 
 ### Bước 3. Nexus cho Python và Node.js
 
@@ -373,7 +394,7 @@ Không cần cấu hình thêm: server `SonarQube`, token và webhook về Jenki
 2. Thử trên một app mẫu: trong MR của app đó, đổi tạm `@Library('ci-lib@feature/<tên>') _` (nhờ `allowVersionOverride: true`). Hoặc dùng **Replay** trên một build cũ để sửa trực tiếp file của thư viện mà không cần commit.
 3. Chạy đủ ba loại app mẫu (Maven, Python, Node.js) cho thay đổi ảnh hưởng chung.
 4. MR vào `main`, được nhóm platform duyệt, rồi tạo tag mới.
-5. Về sau: viết unit test cho thư viện bằng **JenkinsPipelineUnit** (Gradle) và cho pipeline của repo thư viện tự chạy test trên mỗi MR.
+5. Mọi thay đổi phải qua `gradle test` ([7.12](#712-kiểm-thử-thư-viện)); thêm test cho hành vi mới. Repo thư viện nên có pipeline (Jenkins hoặc GitLab CI, image `gradle:8-jdk21`) chạy `gradle test` trên mỗi MR.
 
 ## 7.8. Bảo mật và quản trị (môi trường ngân hàng)
 
@@ -404,25 +425,27 @@ CVE-2024-XXXXX
 ```groovy
 @Library('ci-lib@v1.0.0') _
 
-ciPipeline(
-  type: 'maven',
+mavenPipeline(
   name: 'shopping-cart',
   javaVersion: '8',
   trivyWaiverUntil: '2026-12-31'
 )
 ```
 
+Bản này nằm sẵn trên nhánh `feature/ci-lib` của repo app (GitHub `ci-cd-maven-java-ver1`).
+
 | Hạng mục | Trước | Sau |
 |---|---|---|
 | Tag image | `<commit>` | `<version>-<commit>` (ví dụ `0.0.1-SNAPSHOT-a1b2c3d`) |
 | Trivy với Spring Boot 1.5 | `TRIVY_EXIT_CODE='0'` (không chặn) | Waiver có hạn 2026-12-31: build UNSTABLE, sau ngày đó FAILED nếu chưa nâng Spring Boot |
 | Push image từ nhánh tính năng | Có | Không (chỉ `develop`, `release/*`, `main`) |
+| SBOM | Không | `sbom.cdx.json` (CycloneDX) lưu cùng báo cáo Trivy |
 | Cập nhật GitOps, promote, rollback | Trong `Jenkinsfile` (đang tắt) | Chưa có trong v1.0.0; sẽ thêm `ciGitOps` khi bật CD |
 
 Các bước:
 
 1. Làm xong [7.6](#76-chuẩn-bị-nền-tảng-làm-một-lần).
-2. Trong repo `shopping-cart`: tạo nhánh `feature/ci-lib`, thay `Jenkinsfile`, push. Multibranch chạy build cho nhánh này (không push image).
+2. Đẩy nhánh `feature/ci-lib` lên GitLab: `git fetch origin feature/ci-lib`, `git push gitlab origin/feature/ci-lib:refs/heads/feature/ci-lib`. Multibranch quét và build nhánh này (không publish, không push image).
 3. So sánh với build cũ: số test, coverage và Quality Gate trên SonarQube, báo cáo Trivy trong artifact.
 4. Merge vào `develop`, kiểm tra image `…/dev-backend/shopping-cart:<version>-<commit>` có trên Nexus.
 
@@ -453,3 +476,24 @@ Các bước:
 | Quality Gate fail: coverage 0% | Không có báo cáo coverage đúng đường dẫn | Maven: JaCoCo `report`; Python: `coverage.xml`; Node: `coverage/lcov.info` |
 | Build UNSTABLE với thông báo Trivy waiver | Có HIGH/CRITICAL, waiver còn hạn | Lên kế hoạch nâng thư viện/base image trước ngày hết hạn |
 | Sửa thư viện nhưng build vẫn chạy code cũ | App ghim tag cũ | Đúng như thiết kế; tạo tag mới và nâng `@Library` trong app |
+
+## 7.12. Kiểm thử thư viện
+
+Thư viện có bộ unit test chạy được không cần Jenkins:
+
+```bash
+cd helm-install/jenkins/shared-library
+gradle test
+```
+
+| Thành phần | Vai trò |
+|---|---|
+| `build.gradle` | Groovy 2.4.21 (giống runtime pipeline của Jenkins) + JUnit 4; khai báo `vars/`, `resources/` là input để sửa thư viện thì test chạy lại |
+| `test/PipelineHarness.groovy` | Nạp mọi `vars/*.groovy` với các step giả lập (`sh`, `stage`, `podTemplate`, `container`, `withCredentials`, `withSonarQubeEnv`, `waitForQualityGate`, `readMavenPom`, `archiveArtifacts`...), ghi lại lệnh sẽ chạy, container chạy lệnh, stage, file ghi ra, pod YAML |
+| `test/CiConfigTest.groovy` | 10 test: giá trị mặc định, nhánh được bảo vệ, chặn tham số lạ, phiên bản Java không hỗ trợ, **chặn chèn lệnh** qua `name`, `dockerfile`, `pomFile`, `mavenGoals`, `mavenArgs` |
+| `test/MavenPipelineTest.groovy` | 16 test: đủ 8 stage trên `main`; lệnh Maven/Sonar/deploy đúng container và tham số; Java 8 build JDK 8, Sonar JDK 17; pod trên node CI + dind `--insecure-registry`; nhánh tính năng không publish/push; `pomFile`/`mavenGoals`/`mavenArgs`; version từ parent POM; `settings.xml` không chứa mật khẩu; Quality Gate lỗi dừng build; Trivy chặn, waiver còn hạn → UNSTABLE, waiver hết hạn → FAILED; SBOM; `buildImage: false`; `publish: false` |
+
+Kết quả khi phát triển: **26/26 test đạt**. Đã kiểm chứng test bắt được lỗi: cố ý bỏ `nodeSelector` và luôn coi nhánh là "được bảo vệ" thì 3 test fail.
+
+Giới hạn: harness không mô phỏng CPS (serialize trạng thái pipeline), plugin thật, hay kết nối cụm. Vì vậy mỗi phiên bản vẫn phải chạy thử một build thật (nhánh `feature/ci-lib` của `shopping-cart`) trước khi tag.
+

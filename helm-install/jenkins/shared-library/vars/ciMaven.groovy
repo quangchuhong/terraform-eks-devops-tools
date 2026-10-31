@@ -1,16 +1,28 @@
 // Maven (Java, Spring Boot): build + unit tests + JaCoCo, SonarQube, deploy to Nexus.
 // Contract for the app repo:
-//   - pom.xml with the JaCoCo plugin (report goal bound to verify -> target/site/jacoco/jacoco.xml)
+//   - pom.xml (or pomFile) with the JaCoCo plugin (report goal bound to verify -> target/site/jacoco/jacoco.xml)
 //   - distributionManagement with ids maven-releases / maven-snapshots when publish = true
+// Parameters (ciConfig.app): pomFile (default pom.xml), mavenGoals (default "clean verify"),
+// mavenArgs (extra options such as "-Pci -DskipITs=false", default empty).
 
 def version(Map app) {
-  return readMavenPom(file: 'pom.xml').version
+  def pom = readMavenPom(file: app.pomFile)
+  // A module may inherit its version from the parent POM
+  def v = pom.version ?: pom.parent?.version
+  if (!v) {
+    error "ciMaven: no version in ${app.pomFile}"
+  }
+  return v
+}
+
+def mvn(Map app, String goals) {
+  return "mvn -B -s .ci-settings.xml -f ${app.pomFile} ${goals} ${app.mavenArgs}".trim()
 }
 
 def build(Map app, Map cfg) {
   withNexus(cfg) {
     container('build') {
-      sh 'mvn -B -s .ci-settings.xml clean verify'
+      sh mvn(app, app.mavenGoals)
     }
   }
   junit testResults: '**/target/surefire-reports/*.xml'
@@ -25,7 +37,7 @@ def sonar(Map app, Map cfg) {
       // safe.directory git refuses the repo and SonarQube has no blame data (all code looks new).
       sh """
         git config --global --add safe.directory "\$WORKSPACE"
-        mvn -B -s .ci-settings.xml org.sonarsource.scanner.maven:sonar-maven-plugin:${cfg.sonarMavenPlugin}:sonar \\
+        ${mvn(app, "org.sonarsource.scanner.maven:sonar-maven-plugin:${cfg.sonarMavenPlugin}:sonar")} \\
           -Dsonar.projectKey=${app.sonarProjectKey} \\
           -Dsonar.projectVersion=${app.version} \\
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
@@ -37,7 +49,7 @@ def sonar(Map app, Map cfg) {
 def publish(Map app, Map cfg) {
   withNexus(cfg) {
     container('build') {
-      sh 'mvn -B -s .ci-settings.xml deploy -DskipTests'
+      sh mvn(app, 'deploy -DskipTests')
     }
   }
 }

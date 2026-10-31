@@ -24,7 +24,7 @@ def call(Map args = [:]) {
         app.version = langVersion(app)
         def tag = "${app.version}-${app.commit}".replaceAll('[^A-Za-z0-9_.-]', '-')
         app.image = "${cfg.registry}/${app.imageGroup}/${app.name}:${tag}".toString()
-        currentBuild.displayName = "#${env.BUILD_NUMBER} ${tag}"
+        currentBuild.displayName = "#${env.BUILD_NUMBER} ${tag}".toString()
         echo "[ci-lib] type=${app.type} branch=${app.branch} version=${app.version} image=${app.image}"
       }
 

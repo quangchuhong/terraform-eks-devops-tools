@@ -3,8 +3,7 @@
 // the waiver is approved by Security and must be renewed (or removed) before that date.
 @Library('ci-lib@v1.0.0') _
 
-ciPipeline(
-  type: 'maven',
+mavenPipeline(
   name: 'shopping-cart',
   javaVersion: '8',
   trivyWaiverUntil: '2026-12-31'

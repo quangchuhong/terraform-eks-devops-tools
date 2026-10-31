@@ -1,0 +1,33 @@
+// Unit tests of the shared library (not used by Jenkins): gradle test
+// The vars/*.groovy scripts are loaded by test/PipelineHarness.groovy with mocked pipeline steps,
+// on Groovy 2.4 like the Jenkins pipeline runtime.
+plugins {
+    id 'groovy'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.codehaus.groovy:groovy-all:2.4.21'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+sourceSets {
+    test {
+        groovy { srcDirs = ['test'] }
+        resources { srcDirs = [] }
+    }
+}
+
+test {
+    // The library sources are read at test runtime, not compiled: declare them so a change reruns the tests
+    inputs.dir 'vars'
+    inputs.dir 'resources'
+    systemProperty 'lib.dir', projectDir.absolutePath
+    testLogging {
+        events 'passed', 'failed'
+        exceptionFormat 'full'
+    }
+}

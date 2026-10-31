@@ -727,6 +727,24 @@ controller:
           s3:
             container: "jenkins-609320954321-artifacts"
             prefix: "jenkins/"
+      # Shared Library ci-lib (repo devops/ci-cd/jenkins-shared-library, source copy in
+      # helm-install/jenkins/shared-library). Trusted: only the platform team can change that repo.
+      # Apps must name a version: @Library('ci-lib@v1.0.0') _
+      shared-library: |
+        unclassified:
+          globalLibraries:
+            libraries:
+              - name: "ci-lib"
+                defaultVersion: "v1.0.0"
+                implicit: false
+                allowVersionOverride: true
+                includeInChangesets: false
+                retriever:
+                  modernSCM:
+                    scm:
+                      git:
+                        remote: "http://gitlab.gitlabonlinecom.click/devops/ci-cd/jenkins-shared-library.git"
+                        credentialsId: "gitlab-token-dev-group"
 
     # The kubernetes cloud + agent pod template come from defaultConfig (agent.* values);
     # a second jenkins.clouds script would conflict with it.

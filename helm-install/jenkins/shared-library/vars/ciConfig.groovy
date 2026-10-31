@@ -17,6 +17,7 @@ def call() {
       trivy : 'aquasec/trivy:0.68.2',
       sonar : 'sonarsource/sonar-scanner-cli:12.2',
       maven : ['8' : 'maven:3.9.9-eclipse-temurin-8',
+               '11': 'maven:3.9.9-eclipse-temurin-11',
                '17': 'maven:3.9.9-eclipse-temurin-17',
                '21': 'maven:3.9.11-eclipse-temurin-21'],
       python: ['3.12': 'python:3.12.12-slim',
@@ -30,7 +31,8 @@ def call() {
 // Parameters accepted from the Jenkinsfile, with their defaults
 def app(Map args) {
   def allowed = ['type', 'name', 'sonarProjectKey', 'javaVersion', 'pythonVersion', 'nodeVersion',
-                 'imageGroup', 'dockerfile', 'buildImage', 'publish', 'trivyWaiverUntil']
+                 'imageGroup', 'dockerfile', 'buildImage', 'publish', 'trivyWaiverUntil',
+                 'pomFile', 'mavenGoals', 'mavenArgs']
   def unknown = args.keySet().findAll { !(it in allowed) }
   if (unknown) {
     error "ciPipeline: unknown parameter(s) ${unknown}, allowed: ${allowed}"
@@ -50,12 +52,26 @@ def app(Map args) {
     dockerfile      : args.dockerfile ?: 'Dockerfile',
     buildImage      : args.buildImage != false,
     publish         : args.publish != null ? args.publish : (args.type == 'maven'),
-    trivyWaiverUntil: args.trivyWaiverUntil
+    trivyWaiverUntil: args.trivyWaiverUntil,
+    // Maven only
+    pomFile         : args.pomFile ?: 'pom.xml',
+    mavenGoals      : args.mavenGoals ?: 'clean verify',
+    mavenArgs       : args.mavenArgs ?: ''
   ]
-  ['name', 'sonarProjectKey', 'imageGroup', 'dockerfile'].each { k ->
-    if (!app[k] || !(app[k] ==~ /[A-Za-z0-9][A-Za-z0-9._\/-]*/)) {
+  ['name', 'sonarProjectKey', 'imageGroup', 'dockerfile', 'pomFile'].each { k ->
+    if (!app[k] || !(app[k] ==~ /[A-Za-z0-9][A-Za-z0-9._\/-]*/) || app[k].contains('..')) {
       error "ciPipeline: invalid ${k} '${app[k]}'"
     }
+  }
+  // Goals and extra arguments go into a shell command: only plain Maven tokens
+  // (goals, -D/-P/-pl options), no quotes, $, ;, |, &, backticks or redirections
+  ['mavenGoals', 'mavenArgs'].each { k ->
+    if (!(app[k] ==~ /[A-Za-z0-9 ._:=,\/@+-]*/)) {
+      error "ciPipeline: invalid ${k} '${app[k]}' (allowed: letters, digits, space and . _ : = , / @ + -)"
+    }
+  }
+  if (!app.mavenGoals.trim()) {
+    error 'ciPipeline: mavenGoals must not be empty'
   }
   if (app.trivyWaiverUntil && !(app.trivyWaiverUntil ==~ /\d{4}-\d{2}-\d{2}/)) {
     error "ciPipeline: trivyWaiverUntil must be YYYY-MM-DD (got '${app.trivyWaiverUntil}')"

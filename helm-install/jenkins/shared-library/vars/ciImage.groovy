@@ -26,13 +26,15 @@ def scan(Map app, Map cfg) {
       trivy image --server ${cfg.trivyServer} --input image.tar --scanners vuln \\
         --format json --output trivy-report.json --no-progress
       trivy convert --format table --output trivy-report.txt trivy-report.json
+      trivy image --server ${cfg.trivyServer} --input image.tar --format cyclonedx --output sbom.cdx.json --no-progress
     """
     rc = sh(returnStatus: true, script: """
       trivy image --server ${cfg.trivyServer} --input image.tar --scanners vuln \\
         --severity HIGH,CRITICAL --exit-code 1 --no-progress
     """)
   }
-  archiveArtifacts artifacts: 'trivy-report.json,trivy-report.txt', allowEmptyArchive: true
+  // Reports + SBOM (CycloneDX, PCI DSS 6.3.2) are kept with the build (artifact manager S3)
+  archiveArtifacts artifacts: 'trivy-report.json,trivy-report.txt,sbom.cdx.json', allowEmptyArchive: true
   if (rc != 0) {
     if (waived) {
       unstable "Trivy: HIGH/CRITICAL vulnerabilities found, accepted by waiver until ${app.trivyWaiverUntil}"

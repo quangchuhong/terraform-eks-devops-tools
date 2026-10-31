@@ -1,0 +1,11 @@
+// Multi-module Maven project: build the service module (and the modules it needs) with a CI profile.
+@Library('ci-lib@v1.0.0') _
+
+mavenPipeline(
+  name: 'payment-api',
+  javaVersion: '17',
+  pomFile: 'pom.xml',
+  mavenGoals: 'clean verify',
+  mavenArgs: '-Pci -pl payment-api -am',
+  dockerfile: 'payment-api/Dockerfile'
+)
