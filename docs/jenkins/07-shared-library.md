@@ -308,7 +308,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-`gradle test` là tuỳ chọn trên máy có Gradle (chạy 26 unit test, [7.12](#712-kiểm-thử-thư-viện)).
+`gradle test` là tuỳ chọn trên máy có Gradle (chạy 31 unit test, [7.12](#712-kiểm-thử-thư-viện)).
 
 Trên GitLab: **Settings → Repository → Protected branches**: `main` chỉ Maintainer được merge, không ai push trực tiếp. **Protected tags**: `v*` chỉ Maintainer tạo. Bật **Merge request approvals** (ít nhất 1–2 người nhóm platform) và thêm `CODEOWNERS`.
 
@@ -491,9 +491,10 @@ gradle test
 | `build.gradle` | Groovy 2.4.21 (giống runtime pipeline của Jenkins) + JUnit 4; khai báo `vars/`, `resources/` là input để sửa thư viện thì test chạy lại |
 | `test/PipelineHarness.groovy` | Nạp mọi `vars/*.groovy` với các step giả lập (`sh`, `stage`, `podTemplate`, `container`, `withCredentials`, `withSonarQubeEnv`, `waitForQualityGate`, `readMavenPom`, `archiveArtifacts`...), ghi lại lệnh sẽ chạy, container chạy lệnh, stage, file ghi ra, pod YAML |
 | `test/CiConfigTest.groovy` | 10 test: giá trị mặc định, nhánh được bảo vệ, chặn tham số lạ, phiên bản Java không hỗ trợ, **chặn chèn lệnh** qua `name`, `dockerfile`, `pomFile`, `mavenGoals`, `mavenArgs` |
+| `test/ExampleJenkinsfilesTest.groovy` | 5 test: chạy từng `examples/Jenkinsfile.*` (Spring Boot, thư viện Java, nhiều module, Python, Node.js) qua thư viện, nên ví dụ hỏng cũng làm test fail |
 | `test/MavenPipelineTest.groovy` | 16 test: đủ 8 stage trên `main`; lệnh Maven/Sonar/deploy đúng container và tham số; Java 8 build JDK 8, Sonar JDK 17; pod trên node CI + dind `--insecure-registry`; nhánh tính năng không publish/push; `pomFile`/`mavenGoals`/`mavenArgs`; version từ parent POM; `settings.xml` không chứa mật khẩu; Quality Gate lỗi dừng build; Trivy chặn, waiver còn hạn → UNSTABLE, waiver hết hạn → FAILED; SBOM; `buildImage: false`; `publish: false` |
 
-Kết quả khi phát triển: **26/26 test đạt**. Đã kiểm chứng test bắt được lỗi: cố ý bỏ `nodeSelector` và luôn coi nhánh là "được bảo vệ" thì 3 test fail.
+Kết quả khi phát triển: **31/31 test đạt**. Đã kiểm chứng test bắt được lỗi: cố ý bỏ `nodeSelector` và luôn coi nhánh là "được bảo vệ" thì 3 test fail.
 
 Giới hạn: harness không mô phỏng CPS (serialize trạng thái pipeline), plugin thật, hay kết nối cụm. Vì vậy mỗi phiên bản vẫn phải chạy thử một build thật (nhánh `feature/ci-lib` của `shopping-cart`) trước khi tag.
 
