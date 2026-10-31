@@ -56,6 +56,8 @@ runners:
   executor: kubernetes
   config: |
     [[runners]]
+      # Parallel job requests to GitLab: with 1, long polling delays jobs (runner warning at startup)
+      request_concurrency = 4
       [runners.kubernetes]
         namespace = "{{ .Release.Namespace }}"
         image = "alpine:3.22"
